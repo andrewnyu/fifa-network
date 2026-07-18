@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import {
   DatabaseNotConfiguredError,
+  ensurePeopleSchema,
   getPeopleSql,
   hashEditToken,
   makeSlug,
@@ -58,6 +59,7 @@ export async function GET(request: Request) {
     }
 
     const sql = getPeopleSql();
+    await ensurePeopleSchema(sql);
 
     const rows = slug
       ? await sql`
@@ -101,6 +103,7 @@ export async function POST(request: Request) {
     }
 
     const sql = getPeopleSql();
+    await ensurePeopleSchema(sql);
     const id = crypto.randomUUID();
     const slug = makeSlug(profile.displayName);
     const editToken = `${crypto.randomUUID()}${crypto.randomUUID()}`;
@@ -161,6 +164,7 @@ export async function PUT(request: Request) {
     }
 
     const sql = getPeopleSql();
+    await ensurePeopleSchema(sql);
     const editTokenHash = await hashEditToken(body.editToken);
     const [existing] = await sql`
       SELECT id::text FROM people

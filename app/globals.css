@@ -1584,6 +1584,37 @@ main {
   z-index: 8;
 }
 
+.reach-profile .people-picker {
+  z-index: 8;
+}
+
+.reach-source-tabs {
+  display: grid;
+  gap: 6px;
+  grid-template-columns: 0.75fr 1.25fr;
+  margin-bottom: 16px;
+}
+
+.reach-source-tabs button {
+  background: rgba(255, 255, 255, 0.48);
+  border: 1px solid rgba(54, 52, 112, 0.12);
+  border-radius: 999px;
+  color: #6e6a9d;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  min-height: 32px;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+
+.reach-source-tabs button.active {
+  background: var(--blue);
+  border-color: var(--blue);
+  color: white;
+}
+
 .reach-profile .picker-field {
   background: rgba(255, 255, 255, 0.72);
 }
@@ -1634,6 +1665,67 @@ main {
   color: #6e6a9d;
   font-size: 9px;
   margin-top: 3px;
+}
+
+.reach-player-card .community-profile-label {
+  align-self: flex-start;
+  background: rgba(79, 111, 255, 0.11);
+  border-radius: 4px;
+  color: var(--blue);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-style: italic;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  padding: 4px 6px;
+}
+
+.reach-select-prompt {
+  color: #6e6a9d;
+  font-size: 11px;
+  line-height: 1.55;
+  padding: 30px 0 25px;
+}
+
+.reach-chart-panel.is-empty {
+  align-items: center;
+  display: flex;
+  justify-content: center;
+}
+
+.reach-empty-chart {
+  align-items: center;
+  color: #706c9d;
+  display: flex;
+  flex-direction: column;
+  max-width: 310px;
+  padding: 40px 20px;
+  text-align: center;
+}
+
+.reach-empty-chart > span {
+  align-items: center;
+  background: #e9e7ff;
+  border-radius: 50%;
+  display: flex;
+  font-size: 30px;
+  height: 64px;
+  justify-content: center;
+  margin-bottom: 18px;
+  width: 64px;
+}
+
+.reach-empty-chart strong {
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+}
+
+.reach-empty-chart p {
+  font-size: 11px;
+  line-height: 1.55;
+  margin: 8px 0 0;
 }
 
 .reach-player-card small {
@@ -2396,6 +2488,11 @@ footer > div a:hover {
   .reach-chart-panel,
   .reach-profile {
     min-width: 0;
+  }
+
+  .reach-source-tabs button {
+    font-size: 9px;
+    min-height: 44px;
   }
 
   .reach-chart-header span:last-child {

@@ -186,9 +186,11 @@ function findShortestRoute(
 
 function calculateDistanceStats(
   graph: SearchableGraph,
-  sourceIndex: number,
+  sourceIndexes: number[],
+  sourceDistance = 0,
 ): DistanceStats | null {
-  if (sourceIndex < 0) return null;
+  const sources = Array.from(new Set(sourceIndexes.filter((index) => index >= 0)));
+  if (sources.length === 0) return null;
 
   const playerSeen = new Uint8Array(graph.players.length);
   const groupSeen = new Uint8Array(graph.events.length);
@@ -199,9 +201,12 @@ function calculateDistanceStats(
   let head = 0;
   let tail = 0;
 
-  playerSeen[sourceIndex] = 1;
-  distance[sourceIndex] = 0;
-  queue[tail++] = sourceIndex;
+  sources.forEach((sourceIndex) => {
+    playerSeen[sourceIndex] = 1;
+    distance[sourceIndex] = sourceDistance;
+    if (sourceDistance > 0) counts[sourceDistance] += 1;
+    queue[tail++] = sourceIndex;
+  });
 
   while (head < tail) {
     const currentPlayer = queue[head++];
@@ -237,7 +242,7 @@ function calculateDistanceStats(
     }),
     reachedWithinSix,
     reachedPercentage: (reachedWithinSix / universe) * 100,
-    outsideSix: universe - reachedWithinSix - 1,
+    outsideSix: universe - reachedWithinSix - (sourceDistance === 0 ? sources.length : 0),
   };
 }
 
@@ -394,10 +399,12 @@ function PeoplePicker({
   graph,
   onSelect,
   label = "FROM A PERSON",
+  id = "community-person",
 }: {
   graph: SearchableGraph;
   onSelect: (person: PublicPerson) => void;
   label?: string;
+  id?: string;
 }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<PublicPerson[]>([]);
@@ -446,11 +453,11 @@ function PeoplePicker({
 
   return (
     <div className="people-picker">
-      <label htmlFor="community-person">{label}</label>
+      <label htmlFor={id}>{label}</label>
       <div className="people-field">
         <span aria-hidden="true">⌕</span>
         <input
-          id="community-person"
+          id={id}
           type="search"
           value={query}
           onChange={(event) => {
@@ -518,6 +525,8 @@ export default function Home() {
   const [targetQuery, setTargetQuery] = useState("Harry Kane");
   const [statsPlayerIndex, setStatsPlayerIndex] = useState(-1);
   const [statsQuery, setStatsQuery] = useState("Lionel Messi");
+  const [statsMode, setStatsMode] = useState<"player" | "community">("player");
+  const [statsCommunityPerson, setStatsCommunityPerson] = useState<PublicPerson | null>(null);
   const [sourceMode, setSourceMode] = useState<"player" | "visitor" | "community">("player");
   const [visitor, setVisitor] = useState<VisitorProfile>({
     name: "",
@@ -656,10 +665,25 @@ export default function Home() {
     };
   }, [fitRevision, route]);
 
-  const distanceStats = useMemo(
-    () => (graph ? calculateDistanceStats(graph, statsPlayerIndex) : null),
-    [graph, statsPlayerIndex],
-  );
+  const statsCommunityIndexes = useMemo(() => {
+    if (!graph || !statsCommunityPerson) return [];
+    return statsCommunityPerson.playerIds
+      .map((id) => graph.playerIdToIndex.get(id))
+      .filter((index): index is number => index !== undefined);
+  }, [graph, statsCommunityPerson]);
+
+  const distanceStats = useMemo(() => {
+    if (!graph) return null;
+    return statsMode === "community"
+      ? calculateDistanceStats(graph, statsCommunityIndexes, 1)
+      : calculateDistanceStats(graph, [statsPlayerIndex]);
+  }, [graph, statsCommunityIndexes, statsMode, statsPlayerIndex]);
+
+  const statsSourceName = statsMode === "community"
+    ? statsCommunityPerson?.displayName || "Community profile"
+    : graph && statsPlayerIndex >= 0
+      ? graph.players[statsPlayerIndex].shortName
+      : "Player";
 
   const addVisitorLink = (playerIndex = linkCandidateIndex) => {
     if (!graph || playerIndex < 0 || !visitor.name.trim()) return;
@@ -1244,56 +1268,109 @@ export default function Home() {
             <h2>How far does one<br /><em>name travel?</em></h2>
           </div>
           <p>
-            Choose a player to see how much of the entire football universe sits
-            exactly one, two, three—up to six—teammate links away.
+            Choose a player or community profile to see how much of the football
+            universe sits exactly one, two, three—up to six—links away.
           </p>
         </div>
 
-        {graph && distanceStats && statsPlayerIndex >= 0 ? (
+        {graph && statsPlayerIndex >= 0 ? (
           <div className="reach-dashboard">
             <aside className="reach-profile">
-              <span className="section-number">03 · SELECT A PLAYER</span>
-              <PlayerPicker
-                id="stats-player"
-                label="PLAYER"
-                graph={graph}
-                selectedIndex={statsPlayerIndex}
-                query={statsQuery}
-                onQueryChange={setStatsQuery}
-                onSelect={setStatsPlayerIndex}
-                placeholder="Search a player"
-              />
+              <span className="section-number">03 · SELECT A STARTING POINT</span>
+              <div className="reach-source-tabs" aria-label="Choose reach source type">
+                <button
+                  type="button"
+                  className={statsMode === "player" ? "active" : ""}
+                  aria-pressed={statsMode === "player"}
+                  onClick={() => setStatsMode("player")}
+                >
+                  Player
+                </button>
+                <button
+                  type="button"
+                  className={statsMode === "community" ? "active" : ""}
+                  aria-pressed={statsMode === "community"}
+                  onClick={() => setStatsMode("community")}
+                >
+                  Community profile
+                </button>
+              </div>
+
+              {statsMode === "player" ? (
+                <PlayerPicker
+                  id="stats-player"
+                  label="PLAYER"
+                  graph={graph}
+                  selectedIndex={statsPlayerIndex}
+                  query={statsQuery}
+                  onQueryChange={setStatsQuery}
+                  onSelect={setStatsPlayerIndex}
+                  placeholder="Search a player"
+                />
+              ) : (
+                <PeoplePicker
+                  id="stats-community-person"
+                  graph={graph}
+                  label="COMMUNITY PROFILE"
+                  onSelect={setStatsCommunityPerson}
+                />
+              )}
 
               <div className="reach-player-card">
                 <div className="reach-player-avatar">
-                  {getInitials(graph.players[statsPlayerIndex].shortName)}
+                  {getInitials(statsSourceName)}
                 </div>
                 <div>
-                  <strong>{graph.players[statsPlayerIndex].shortName}</strong>
-                  <span>
-                    {graph.players[statsPlayerIndex].position} · {graph.players[statsPlayerIndex].nationality}
-                  </span>
-                  <small>
-                    {graph.players[statsPlayerIndex].club || formatEdition(graph.players[statsPlayerIndex].lastYear)}
-                  </small>
+                  <strong>{statsSourceName}</strong>
+                  {statsMode === "community" && statsCommunityPerson ? (
+                    <>
+                      <span className="community-profile-label">COMMUNITY PROFILE</span>
+                      <small>
+                        {statsCommunityIndexes.length} direct player connection
+                        {statsCommunityIndexes.length === 1 ? "" : "s"}
+                      </small>
+                    </>
+                  ) : statsMode === "player" ? (
+                    <>
+                      <span>
+                        {graph.players[statsPlayerIndex].position} · {graph.players[statsPlayerIndex].nationality}
+                      </span>
+                      <small>
+                        {graph.players[statsPlayerIndex].club || formatEdition(graph.players[statsPlayerIndex].lastYear)}
+                      </small>
+                    </>
+                  ) : (
+                    <span className="community-profile-label">SELECT A COMMUNITY PROFILE</span>
+                  )}
                 </div>
               </div>
 
-              <div className="reach-total">
-                <span>WITHIN SIX DEGREES</span>
-                <strong>{formatNumber(distanceStats.reachedWithinSix)}</strong>
-                <em>{formatPercentage(distanceStats.reachedPercentage)} of all players</em>
-              </div>
+              {distanceStats ? (
+                <div className="reach-total">
+                  <span>WITHIN SIX DEGREES</span>
+                  <strong>{formatNumber(distanceStats.reachedWithinSix)}</strong>
+                  <em>{formatPercentage(distanceStats.reachedPercentage)} of all players</em>
+                </div>
+              ) : (
+                <div className="reach-select-prompt">Search and select a shared profile to calculate its reach.</div>
+              )}
 
               <p className="reach-note">
                 Percentages use all {formatNumber(graph.meta.playerCount)} players as the universe.
-                The selected player is degree 0 and is not included below.
+                {statsMode === "community"
+                  ? " Direct connections begin at degree 1."
+                  : " The selected player is degree 0 and is not included below."}
               </p>
             </aside>
 
-            <div className="reach-chart-panel">
+            <div className={`reach-chart-panel ${distanceStats ? "" : "is-empty"}`}>
+              {distanceStats ? (
+                <>
               <div className="reach-chart-header">
-                <span>EXACT DISTANCE FROM {graph.players[statsPlayerIndex].shortName.toLocaleUpperCase()}</span>
+                <span>
+                  EXACT DISTANCE FROM {statsSourceName.toLocaleUpperCase()}
+                  {statsMode === "community" && " · COMMUNITY PROFILE"}
+                </span>
                 <span>PLAYERS · % OF UNIVERSE</span>
               </div>
               <ol className="degree-chart">
@@ -1324,6 +1401,14 @@ export default function Home() {
                   {formatPercentage((distanceStats.outsideSix / graph.meta.playerCount) * 100)}
                 </em>
               </div>
+                </>
+              ) : (
+                <div className="reach-empty-chart">
+                  <span aria-hidden="true">⌕</span>
+                  <strong>Select a community profile</strong>
+                  <p>We’ll measure the football universe from all of its direct player links.</p>
+                </div>
+              )}
             </div>
           </div>
         ) : (

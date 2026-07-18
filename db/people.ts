@@ -29,6 +29,47 @@ export function getPeopleSql(): NeonQueryFunction<false, false> {
   return neon(databaseUrl);
 }
 
+let peopleSchemaReady: Promise<void> | null = null;
+
+export function ensurePeopleSchema(sql: NeonQueryFunction<false, false>) {
+  if (!peopleSchemaReady) {
+    peopleSchemaReady = sql.transaction((transaction) => [
+      transaction`
+        CREATE TABLE IF NOT EXISTS people (
+          id uuid PRIMARY KEY,
+          slug text NOT NULL UNIQUE,
+          display_name text NOT NULL CHECK (char_length(display_name) BETWEEN 2 AND 80),
+          normalized_name text NOT NULL,
+          edit_token_hash text NOT NULL,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          updated_at timestamptz NOT NULL DEFAULT now()
+        )
+      `,
+      transaction`
+        CREATE INDEX IF NOT EXISTS people_normalized_name_idx
+        ON people (normalized_name text_pattern_ops)
+      `,
+      transaction`
+        CREATE TABLE IF NOT EXISTS person_player_links (
+          person_id uuid NOT NULL REFERENCES people(id) ON DELETE CASCADE,
+          player_id bigint NOT NULL CHECK (player_id > 0),
+          position smallint NOT NULL DEFAULT 0,
+          created_at timestamptz NOT NULL DEFAULT now(),
+          PRIMARY KEY (person_id, player_id)
+        )
+      `,
+      transaction`
+        CREATE INDEX IF NOT EXISTS person_player_links_player_idx
+        ON person_player_links (player_id)
+      `,
+    ]).then(() => undefined).catch((error) => {
+      peopleSchemaReady = null;
+      throw error;
+    });
+  }
+  return peopleSchemaReady;
+}
+
 export function normalizeDisplayName(value: unknown) {
   if (typeof value !== "string") return "";
   return value.trim().replace(/\s+/g, " ");
