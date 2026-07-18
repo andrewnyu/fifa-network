@@ -56,6 +56,17 @@ type VisitorProfile = {
   linkedPlayerIds: number[];
 };
 
+type DistanceStats = {
+  buckets: {
+    degree: number;
+    count: number;
+    percentage: number;
+  }[];
+  reachedWithinSix: number;
+  reachedPercentage: number;
+  outsideSix: number;
+};
+
 const DEFAULT_SOURCE_ID = 158023; // Lionel Messi
 const DEFAULT_TARGET_ID = 202126; // Harry Kane
 const PROFILE_KEY = "the-pass-profile-v1";
@@ -141,6 +152,63 @@ function findShortestRoute(
   return { players, eventIds, fromVisitor };
 }
 
+function calculateDistanceStats(
+  graph: SearchableGraph,
+  sourceIndex: number,
+): DistanceStats | null {
+  if (sourceIndex < 0) return null;
+
+  const playerSeen = new Uint8Array(graph.players.length);
+  const groupSeen = new Uint8Array(graph.events.length);
+  const distance = new Int8Array(graph.players.length);
+  distance.fill(-1);
+  const queue = new Int32Array(graph.players.length);
+  const counts = new Int32Array(7);
+  let head = 0;
+  let tail = 0;
+
+  playerSeen[sourceIndex] = 1;
+  distance[sourceIndex] = 0;
+  queue[tail++] = sourceIndex;
+
+  while (head < tail) {
+    const currentPlayer = queue[head++];
+    const currentDistance = distance[currentPlayer];
+    if (currentDistance >= 6) continue;
+
+    for (const eventId of graph.playerGroups[currentPlayer]) {
+      if (groupSeen[eventId]) continue;
+      groupSeen[eventId] = 1;
+
+      for (const nextPlayer of graph.events[eventId].members) {
+        if (playerSeen[nextPlayer]) continue;
+        const nextDistance = currentDistance + 1;
+        playerSeen[nextPlayer] = 1;
+        distance[nextPlayer] = nextDistance;
+        counts[nextDistance] += 1;
+        queue[tail++] = nextPlayer;
+      }
+    }
+  }
+
+  const universe = graph.players.length;
+  const reachedWithinSix = counts.reduce((sum, count) => sum + count, 0);
+  return {
+    buckets: Array.from({ length: 6 }, (_, index) => {
+      const degree = index + 1;
+      const count = counts[degree];
+      return {
+        degree,
+        count,
+        percentage: (count / universe) * 100,
+      };
+    }),
+    reachedWithinSix,
+    reachedPercentage: (reachedWithinSix / universe) * 100,
+    outsideSix: universe - reachedWithinSix - 1,
+  };
+}
+
 function getInitials(name: string) {
   const parts = name.split(/[\s.]+/).filter(Boolean);
   if (parts.length === 1) return parts[0].slice(0, 2).toLocaleUpperCase();
@@ -149,6 +217,12 @@ function getInitials(name: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en").format(value);
+}
+
+function formatPercentage(value: number) {
+  if (value >= 10) return `${value.toFixed(1)}%`;
+  if (value >= 1) return `${value.toFixed(2)}%`;
+  return `${value.toFixed(3)}%`;
 }
 
 function formatEdition(edition: number) {
@@ -300,6 +374,8 @@ export default function Home() {
   const [targetIndex, setTargetIndex] = useState(-1);
   const [sourceQuery, setSourceQuery] = useState("Lionel Messi");
   const [targetQuery, setTargetQuery] = useState("Harry Kane");
+  const [statsPlayerIndex, setStatsPlayerIndex] = useState(-1);
+  const [statsQuery, setStatsQuery] = useState("Lionel Messi");
   const [sourceMode, setSourceMode] = useState<"player" | "visitor">("player");
   const [visitor, setVisitor] = useState<VisitorProfile>({
     name: "",
@@ -326,8 +402,10 @@ export default function Home() {
         setGraph(searchable);
         setSourceIndex(source);
         setTargetIndex(target);
+        setStatsPlayerIndex(source);
         setSourceQuery(searchable.players[source].shortName);
         setTargetQuery(searchable.players[target].shortName);
+        setStatsQuery(searchable.players[source].shortName);
       })
       .catch((error: Error) => {
         if (!cancelled) setLoadError(error.message);
@@ -374,6 +452,11 @@ export default function Home() {
   const degreeCount = route
     ? route.eventIds.length + (route.fromVisitor ? 1 : 0)
     : 0;
+
+  const distanceStats = useMemo(
+    () => (graph ? calculateDistanceStats(graph, statsPlayerIndex) : null),
+    [graph, statsPlayerIndex],
+  );
 
   const addVisitorLink = (playerIndex = linkCandidateIndex) => {
     if (!graph || playerIndex < 0 || !visitor.name.trim()) return;
@@ -433,6 +516,7 @@ export default function Home() {
         </a>
         <nav aria-label="Primary navigation">
           <a href="#explorer">Explorer</a>
+          <a href="#reach">Player reach</a>
           <a href="#method">How it works</a>
         </nav>
         <button
@@ -762,6 +846,100 @@ export default function Home() {
             <span><i className="legend-personal" /> Your connection</span>
           </div>
         </div>
+      </section>
+
+      <section className="reach" id="reach">
+        <div className="reach-heading">
+          <div>
+            <p className="eyebrow"><span /> PLAYER REACH</p>
+            <h2>How far does one<br /><em>name travel?</em></h2>
+          </div>
+          <p>
+            Choose a player to see how much of the entire football universe sits
+            exactly one, two, three—up to six—teammate links away.
+          </p>
+        </div>
+
+        {graph && distanceStats && statsPlayerIndex >= 0 ? (
+          <div className="reach-dashboard">
+            <aside className="reach-profile">
+              <span className="section-number">03 · SELECT A PLAYER</span>
+              <PlayerPicker
+                id="stats-player"
+                label="PLAYER"
+                graph={graph}
+                selectedIndex={statsPlayerIndex}
+                query={statsQuery}
+                onQueryChange={setStatsQuery}
+                onSelect={setStatsPlayerIndex}
+                placeholder="Search a player"
+              />
+
+              <div className="reach-player-card">
+                <div className="reach-player-avatar">
+                  {getInitials(graph.players[statsPlayerIndex].shortName)}
+                </div>
+                <div>
+                  <strong>{graph.players[statsPlayerIndex].shortName}</strong>
+                  <span>
+                    {graph.players[statsPlayerIndex].position} · {graph.players[statsPlayerIndex].nationality}
+                  </span>
+                  <small>
+                    {graph.players[statsPlayerIndex].club || formatEdition(graph.players[statsPlayerIndex].lastYear)}
+                  </small>
+                </div>
+              </div>
+
+              <div className="reach-total">
+                <span>WITHIN SIX DEGREES</span>
+                <strong>{formatNumber(distanceStats.reachedWithinSix)}</strong>
+                <em>{formatPercentage(distanceStats.reachedPercentage)} of all players</em>
+              </div>
+
+              <p className="reach-note">
+                Percentages use all {formatNumber(graph.meta.playerCount)} players as the universe.
+                The selected player is degree 0 and is not included below.
+              </p>
+            </aside>
+
+            <div className="reach-chart-panel">
+              <div className="reach-chart-header">
+                <span>EXACT DISTANCE FROM {graph.players[statsPlayerIndex].shortName.toLocaleUpperCase()}</span>
+                <span>PLAYERS · % OF UNIVERSE</span>
+              </div>
+              <ol className="degree-chart">
+                {distanceStats.buckets.map((bucket) => (
+                  <li key={bucket.degree}>
+                    <div className="degree-label">
+                      <strong>{bucket.degree}</strong>
+                      <span>degree{bucket.degree === 1 ? "" : "s"}</span>
+                    </div>
+                    <div className="degree-meter">
+                      <i
+                        style={{
+                          width: `${Math.max(bucket.percentage, bucket.count > 0 ? 0.4 : 0)}%`,
+                        }}
+                      />
+                    </div>
+                    <div className="degree-value">
+                      <strong>{formatNumber(bucket.count)}</strong>
+                      <span>{formatPercentage(bucket.percentage)}</span>
+                    </div>
+                  </li>
+                ))}
+              </ol>
+              <div className="outside-six">
+                <span>Outside six degrees or disconnected</span>
+                <strong>{formatNumber(distanceStats.outsideSix)}</strong>
+                <em>
+                  {formatPercentage((distanceStats.outsideSix / graph.meta.playerCount) * 100)}
+                </em>
+              </div>
+            </div>
+          </div>
+        ) : (
+          <div className="reach-loading" role="status">Calculating player reach…</div>
+        )}
       </section>
 
       <section className="method" id="method">

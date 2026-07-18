@@ -34,6 +34,9 @@ test("server-renders The Pass product shell", async () => {
   assert.match(html, /closer than you think/);
   assert.match(html, /Trace a connection/);
   assert.match(html, /Put yourself on the map/);
+  assert.match(html, /PLAYER REACH/);
+  assert.match(html, /How far does one/);
+  assert.match(html, /Calculating player reach/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape/i);
 });
 

@@ -1268,6 +1268,305 @@ main {
   background: var(--blue);
 }
 
+.reach {
+  margin: 0 auto;
+  max-width: 1424px;
+  padding: 125px 32px 25px;
+}
+
+.reach-heading {
+  align-items: end;
+  display: grid;
+  gap: 70px;
+  grid-template-columns: 1fr 390px;
+  margin: 0 auto 48px;
+  max-width: 1296px;
+}
+
+.reach-heading h2 {
+  font-family: var(--serif);
+  font-size: clamp(48px, 5vw, 72px);
+  font-weight: 400;
+  letter-spacing: -0.06em;
+  line-height: 0.94;
+  margin: 0;
+}
+
+.reach-heading h2 em {
+  color: var(--blue);
+  font-weight: 400;
+}
+
+.reach-heading > p {
+  color: var(--ink-soft);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0 0 5px;
+}
+
+.reach-dashboard {
+  background: var(--white);
+  border: 1px solid var(--line);
+  border-radius: 22px;
+  display: grid;
+  grid-template-columns: 360px minmax(0, 1fr);
+  min-height: 600px;
+  overflow: visible;
+}
+
+.reach-profile {
+  background: #e9e7ff;
+  border-radius: 21px 0 0 21px;
+  padding: 32px;
+}
+
+.reach-profile .section-number {
+  color: #7774a9;
+  margin-bottom: 25px;
+}
+
+.reach-profile .picker {
+  z-index: 8;
+}
+
+.reach-profile .picker-field {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.reach-player-card {
+  align-items: center;
+  border-bottom: 1px solid rgba(54, 52, 112, 0.16);
+  border-top: 1px solid rgba(54, 52, 112, 0.16);
+  display: flex;
+  gap: 14px;
+  margin-top: 27px;
+  padding: 23px 0;
+}
+
+.reach-player-avatar {
+  align-items: center;
+  background: var(--blue);
+  border: 3px solid var(--white);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  flex: 0 0 auto;
+  font-family: var(--serif);
+  font-size: 25px;
+  height: 68px;
+  justify-content: center;
+  letter-spacing: -0.05em;
+  width: 68px;
+}
+
+.reach-player-card > div:last-child {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.reach-player-card strong {
+  font-family: var(--serif);
+  font-size: 21px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reach-player-card span {
+  color: #6e6a9d;
+  font-size: 9px;
+  margin-top: 3px;
+}
+
+.reach-player-card small {
+  color: var(--ink);
+  font-size: 9px;
+  font-weight: 750;
+  margin-top: 6px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.reach-total {
+  display: flex;
+  flex-direction: column;
+  padding: 30px 0 25px;
+}
+
+.reach-total span {
+  color: #7774a9;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.13em;
+}
+
+.reach-total strong {
+  font-family: var(--serif);
+  font-size: 56px;
+  font-weight: 400;
+  letter-spacing: -0.06em;
+  line-height: 1;
+  margin-top: 9px;
+}
+
+.reach-total em {
+  color: var(--blue);
+  font-size: 11px;
+  font-style: normal;
+  font-weight: 750;
+  margin-top: 6px;
+}
+
+.reach-note {
+  color: #706d91;
+  font-size: 9px;
+  line-height: 1.6;
+  margin: 18px 0 0;
+}
+
+.reach-chart-panel {
+  min-width: 0;
+  padding: 35px 38px 30px;
+}
+
+.reach-chart-header {
+  align-items: center;
+  border-bottom: 1px solid var(--line);
+  color: #73827d;
+  display: flex;
+  font-size: 8px;
+  font-weight: 800;
+  justify-content: space-between;
+  letter-spacing: 0.11em;
+  padding-bottom: 18px;
+}
+
+.degree-chart {
+  list-style: none;
+  margin: 0;
+  padding: 8px 0 0;
+}
+
+.degree-chart li {
+  align-items: center;
+  border-bottom: 1px solid rgba(16, 33, 28, 0.1);
+  display: grid;
+  gap: 22px;
+  grid-template-columns: 90px minmax(100px, 1fr) 145px;
+  min-height: 70px;
+}
+
+.degree-label {
+  align-items: baseline;
+  display: flex;
+  gap: 8px;
+}
+
+.degree-label strong {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+  letter-spacing: -0.05em;
+}
+
+.degree-label span {
+  color: #76857f;
+  font-size: 9px;
+  text-transform: uppercase;
+}
+
+.degree-meter {
+  background: #e9e8e1;
+  border-radius: 999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.degree-meter i {
+  background: var(--blue);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  min-width: 0;
+  transition: width 420ms ease;
+}
+
+.degree-chart li:nth-child(2) .degree-meter i {
+  background: #6f8cff;
+}
+
+.degree-chart li:nth-child(3) .degree-meter i {
+  background: #57c9aa;
+}
+
+.degree-chart li:nth-child(4) .degree-meter i {
+  background: #93cc64;
+}
+
+.degree-chart li:nth-child(5) .degree-meter i {
+  background: #c5df46;
+}
+
+.degree-chart li:nth-child(6) .degree-meter i {
+  background: var(--lime-deep);
+}
+
+.degree-value {
+  align-items: baseline;
+  display: flex;
+  justify-content: space-between;
+}
+
+.degree-value strong {
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 14px;
+}
+
+.degree-value span {
+  color: var(--blue);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+}
+
+.outside-six {
+  align-items: baseline;
+  color: #73827d;
+  display: grid;
+  font-size: 9px;
+  gap: 18px;
+  grid-template-columns: 1fr auto auto;
+  letter-spacing: 0.04em;
+  padding-top: 20px;
+  text-transform: uppercase;
+}
+
+.outside-six strong {
+  color: var(--ink);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 11px;
+}
+
+.outside-six em {
+  color: var(--blue);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 10px;
+  font-style: normal;
+}
+
+.reach-loading {
+  align-items: center;
+  border: 1px dashed var(--line);
+  border-radius: 22px;
+  color: var(--ink-soft);
+  display: flex;
+  justify-content: center;
+  min-height: 300px;
+}
+
 .method {
   display: grid;
   gap: 80px;
@@ -1613,6 +1912,71 @@ footer > div a:hover {
   .pitch-lines {
     bottom: 75px;
     top: 120px;
+  }
+
+  .reach {
+    padding: 90px 20px 15px;
+  }
+
+  .reach-heading {
+    align-items: start;
+    gap: 25px;
+    grid-template-columns: 1fr;
+    margin-bottom: 34px;
+  }
+
+  .reach-heading h2 {
+    font-size: clamp(46px, 14vw, 62px);
+  }
+
+  .reach-dashboard {
+    grid-template-columns: 1fr;
+  }
+
+  .reach-profile {
+    border-radius: 21px 21px 0 0;
+    padding: 26px 20px;
+  }
+
+  .reach-total {
+    padding-bottom: 12px;
+  }
+
+  .reach-chart-panel {
+    padding: 26px 18px 24px;
+  }
+
+  .reach-chart-header span:last-child {
+    display: none;
+  }
+
+  .degree-chart li {
+    gap: 12px;
+    grid-template-columns: 70px minmax(70px, 1fr) 108px;
+  }
+
+  .degree-label {
+    gap: 5px;
+  }
+
+  .degree-label strong {
+    font-size: 25px;
+  }
+
+  .degree-label span {
+    font-size: 7px;
+  }
+
+  .degree-value strong {
+    font-size: 11px;
+  }
+
+  .degree-value span {
+    font-size: 8px;
+  }
+
+  .outside-six {
+    gap: 10px;
   }
 
   .method {
