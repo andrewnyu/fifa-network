@@ -1522,6 +1522,23 @@ export default function Home() {
               <p>Kaggle player datasets cover FIFA 15 through EA FC 26, supplemented by sourced squad records.</p>
             </article>
           </div>
+          <div className="community-guide">
+            <div>
+              <span className="community-guide-kicker">COMMUNITY PROFILES</span>
+              <h3>Add yourself—or invite a friend</h3>
+              <p>
+                Community profiles connect real people to the football graph through
+                players they&apos;ve met. Each person should create their own profile on
+                their own device so they can update it later.
+              </p>
+            </div>
+            <ol>
+              <li><span>1</span> Open <strong>Put yourself on the map</strong>.</li>
+              <li><span>2</span> Enter your name and connect one or more players you know.</li>
+              <li><span>3</span> Select <strong>Save to Community</strong>.</li>
+              <li><span>4</span> Find the person under <strong>Community Profiles</strong>.</li>
+            </ol>
+          </div>
           <a className="method-cta" href="#explorer">
             Find a connection <span aria-hidden="true">↑</span>
           </a>

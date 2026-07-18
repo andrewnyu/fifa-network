@@ -1992,6 +1992,74 @@ main {
   letter-spacing: 0.04em;
 }
 
+.community-guide {
+  background: #e9e7ff;
+  border: 1px solid rgba(79, 111, 255, 0.18);
+  border-radius: 16px;
+  display: grid;
+  gap: 34px;
+  grid-template-columns: minmax(0, 0.9fr) minmax(300px, 1.1fr);
+  margin-top: 28px;
+  padding: 25px;
+}
+
+.community-guide-kicker {
+  color: var(--blue);
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.12em;
+}
+
+.community-guide h3 {
+  font-family: var(--serif);
+  font-size: 24px;
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  margin: 9px 0 8px;
+}
+
+.community-guide p {
+  color: #56537e;
+  font-size: 10px;
+  line-height: 1.55;
+  margin: 0;
+}
+
+.community-guide ol {
+  display: grid;
+  gap: 8px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.community-guide li {
+  align-items: center;
+  color: #4f4c75;
+  display: grid;
+  font-size: 10px;
+  gap: 9px;
+  grid-template-columns: 24px 1fr;
+}
+
+.community-guide li > span {
+  align-items: center;
+  background: var(--blue);
+  border-radius: 50%;
+  color: white;
+  display: flex;
+  font-family: var(--font-geist-mono), monospace;
+  font-size: 8px;
+  height: 24px;
+  justify-content: center;
+  width: 24px;
+}
+
+.community-guide strong {
+  color: var(--ink);
+}
+
 .method-cta {
   align-items: center;
   background: var(--blue);
@@ -2600,6 +2668,33 @@ footer > div a:hover {
   .method-grid {
     border-left: 0;
     grid-template-columns: 1fr;
+  }
+
+  .community-guide {
+    gap: 24px;
+    grid-template-columns: 1fr;
+    padding: 22px 18px;
+  }
+
+  .community-guide h3 {
+    font-size: 25px;
+  }
+
+  .community-guide p,
+  .community-guide li {
+    font-size: 12px;
+  }
+
+  .community-guide li {
+    gap: 11px;
+    grid-template-columns: 32px 1fr;
+    line-height: 1.45;
+    min-height: 44px;
+  }
+
+  .community-guide li > span {
+    height: 32px;
+    width: 32px;
   }
 
   .method-grid article {
