@@ -734,16 +734,20 @@ export default function Home() {
 
     try {
       const updating = Boolean(visitor.id && visitor.editToken);
-      const response = await fetch("/api/people", {
-        method: updating ? "PUT" : "POST",
+      const submit = (method: "POST" | "PUT") => fetch("/api/people", {
+        method,
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          id: visitor.id,
-          editToken: visitor.editToken,
+          ...(method === "PUT" ? { id: visitor.id, editToken: visitor.editToken } : {}),
           displayName: visitor.name,
           playerIds: visitor.linkedPlayerIds,
         }),
       });
+
+      let response = await submit(updating ? "PUT" : "POST");
+      if (updating && (response.status === 401 || response.status === 403)) {
+        response = await submit("POST");
+      }
       const payload = (await response.json()) as {
         person?: PublicPerson;
         editToken?: string;
