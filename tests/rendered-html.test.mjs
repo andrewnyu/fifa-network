@@ -42,11 +42,15 @@ test("the generated graph is complete and internally consistent", async () => {
     await readFile(new URL("../public/fifa-graph.json", import.meta.url), "utf8"),
   );
 
-  assert.deepEqual(graph.meta.years, [15, 16, 17, 18, 19, 20, 21]);
+  assert.deepEqual(
+    graph.meta.years,
+    [15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26],
+  );
+  assert.equal(graph.meta.currentEdition, 26);
   assert.equal(graph.meta.playerCount, graph.players.length);
   assert.equal(graph.meta.eventCount, graph.events.length);
-  assert.ok(graph.players.length > 40_000);
-  assert.ok(graph.events.length > 5_000);
+  assert.ok(graph.players.length > 59_000);
+  assert.ok(graph.events.length > 9_000);
 
   for (const event of graph.events) {
     assert.ok(event.members.length >= 2);
@@ -56,12 +60,9 @@ test("the generated graph is complete and internally consistent", async () => {
   }
 });
 
-test("a real explainable route connects Lionel Messi to Harry Kane", async () => {
-  const graph = JSON.parse(
-    await readFile(new URL("../public/fifa-graph.json", import.meta.url), "utf8"),
-  );
-  const source = graph.players.findIndex((player) => player.id === 158023);
-  const target = graph.players.findIndex((player) => player.id === 202126);
+function shortestDistance(graph, sourceId, targetId) {
+  const source = graph.players.findIndex((player) => player.id === sourceId);
+  const target = graph.players.findIndex((player) => player.id === targetId);
   assert.ok(source >= 0 && target >= 0);
 
   const playerGroups = Array.from({ length: graph.players.length }, () => []);
@@ -94,6 +95,22 @@ test("a real explainable route connects Lionel Messi to Harry Kane", async () =>
     }
   }
 
-  assert.ok(distance[target] > 0);
-  assert.ok(distance[target] <= 6);
+  return distance[target];
+}
+
+test("real explainable routes span the original and current editions", async () => {
+  const graph = JSON.parse(
+    await readFile(new URL("../public/fifa-graph.json", import.meta.url), "utf8"),
+  );
+
+  const originalRoute = shortestDistance(graph, 158023, 202126);
+  const currentRoute = shortestDistance(graph, 252371, 239085);
+
+  assert.ok(originalRoute > 0 && originalRoute <= 6);
+  assert.ok(currentRoute > 0 && currentRoute <= 6);
+
+  const judeBellingham = graph.players.find((player) => player.id === 252371);
+  const erlingHaaland = graph.players.find((player) => player.id === 239085);
+  assert.equal(judeBellingham.lastYear, 26);
+  assert.equal(erlingHaaland.lastYear, 26);
 });

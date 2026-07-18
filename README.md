@@ -19,9 +19,9 @@ Open the local URL printed by the development server.
 ## Graph model
 
 The precomputed browser graph is stored at `public/fifa-graph.json`. It contains
-41,533 players and 5,402 compact club-season or national-team-season groups
-from FIFA 15 through FIFA 21. The UI runs breadth-first search over those groups
-and shows the group that explains every hop.
+59,968 players and 9,243 compact club-edition or national-team-edition groups
+from FIFA 15 through EA Sports FC 26. The UI runs breadth-first search over
+those groups and shows the group that explains every hop.
 
 Connections follow the notebook's stated rules:
 
@@ -30,11 +30,19 @@ Connections follow the notebook's stated rules:
 - for countries without a FIFA squad, the top 30 players by overall rating are
   treated as the national squad.
 
-To rebuild the graph, download and extract the seven `players_15.csv` through
-`players_21.csv` files from the notebook's Kaggle dataset, then run:
+The current build combines these public Kaggle datasets:
+
+- [FIFA 15 through EA Sports FC 24](https://www.kaggle.com/datasets/stefanoleone992/ea-sports-fc-24-complete-player-dataset)
+- [EA Sports FC 25](https://www.kaggle.com/datasets/sametozturkk/ea-sports-fc-25-real-player-data-sofifa-merge)
+- [EA Sports FC 26](https://www.kaggle.com/datasets/rovnez/fc-26-fifa-26-player-data)
+
+Download `male_players.csv`, `new-players-data-full.csv`, and the latest FC 26
+CSV respectively, then run:
 
 ```bash
-python3 scripts/build_graph.py /path/to/csv-directory public/fifa-graph.json
+python3 scripts/build_graph.py /path/to/male_players.csv public/fifa-graph.json \
+  --fc25 /path/to/new-players-data-full.csv \
+  --fc26 /path/to/FC26_20250921.csv
 ```
 
 ## Validate
@@ -43,5 +51,5 @@ python3 scripts/build_graph.py /path/to/csv-directory public/fifa-graph.json
 npm test
 ```
 
-The tests build the app, check the graph's integrity, and verify a real route
-between Lionel Messi and Harry Kane.
+The tests build the app, check the graph's integrity, and verify real routes
+across both the original and current generations of players.

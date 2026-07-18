@@ -15,11 +15,11 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "The Pass — Six Degrees of FIFA",
   description:
-    "Trace the shortest chain of club and national-team links between any two players in FIFA 15–21, then add yourself to the network.",
+    "Trace the shortest chain of club and national-team links between any two players from FIFA 15 through EA Sports FC 26, then add yourself to the network.",
   openGraph: {
     title: "The Pass — Every player is closer than you think",
     description:
-      "Explore 41,533 players across seven FIFA editions and find the shortest route between them.",
+      "Explore nearly 60,000 players across twelve FIFA and EA Sports FC editions and find the shortest route between them.",
     type: "website",
   },
   twitter: {

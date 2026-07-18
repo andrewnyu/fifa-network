@@ -33,6 +33,7 @@ type GraphPayload = {
     eventCount: number;
     membershipCount: number;
     years: number[];
+    currentEdition: number;
   };
   players: Player[];
   events: ConnectionGroup[];
@@ -148,6 +149,10 @@ function getInitials(name: string) {
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("en").format(value);
+}
+
+function formatEdition(edition: number) {
+  return edition >= 24 ? `EA FC ${edition}` : `FIFA ${edition}`;
 }
 
 function PlayerPicker({
@@ -283,7 +288,7 @@ function LoadingMap() {
     <div className="map-loading" role="status">
       <span className="loading-ball" aria-hidden="true" />
       <strong>Building the player network</strong>
-      <span>Indexing seven FIFA editions…</span>
+      <span>Indexing twelve FIFA and EA Sports FC editions…</span>
     </div>
   );
 }
@@ -446,7 +451,7 @@ export default function Home() {
       <section className="hero" id="top">
         <div className="hero-copy">
           <p className="eyebrow">
-            <span /> FIFA 15—21 · THE FOOTBALL CONNECTION GRAPH
+            <span /> FIFA 15—EA FC 26 · THE FOOTBALL CONNECTION GRAPH
           </p>
           <h1>
             Every player is
@@ -461,8 +466,8 @@ export default function Home() {
         <div className="hero-stat" aria-label="Key finding from the original analysis">
           <span className="stat-kicker">THE BIG FINDING</span>
           <strong>99.26%</strong>
-          <p>of FIFA 21 players belong to one connected football universe.</p>
-          <span className="stat-source">Original notebook analysis · Andrew Yu</span>
+          <p>of FIFA 21 players belonged to one connected football universe.</p>
+          <span className="stat-source">Original FIFA 21 finding · Andrew Yu</span>
         </div>
       </section>
 
@@ -657,7 +662,7 @@ export default function Home() {
             {graph && (
               <div className="network-stats">
                 <span><strong>{formatNumber(graph.meta.playerCount)}</strong> players</span>
-                <span><strong>7</strong> editions</span>
+                <span><strong>{graph.meta.years.length}</strong> editions</span>
               </div>
             )}
           </div>
@@ -705,7 +710,7 @@ export default function Home() {
                         <div className="node-copy">
                           <strong>{player.shortName}</strong>
                           <small>{player.position} · {player.nationality}</small>
-                          <em>{player.club || `FIFA ${player.lastYear}`}</em>
+                          <em>{player.club || formatEdition(player.lastYear)}</em>
                         </div>
                         <button
                           type="button"
@@ -724,7 +729,7 @@ export default function Home() {
                             <strong>
                               {connection.kind === "club" ? "CLUBMATES" : "NATIONAL TEAM"}
                             </strong>
-                            <small>{connection.name} · FIFA {connection.fifaYear}</small>
+                            <small>{connection.name} · {formatEdition(connection.fifaYear)}</small>
                           </div>
                         </div>
                       )}
@@ -806,11 +811,11 @@ export default function Home() {
             Original notebook ↗
           </a>
           <a
-            href="https://www.kaggle.com/datasets/stefanoleone992/fifa-21-complete-player-dataset"
+            href="https://www.kaggle.com/datasets/rovnez/fc-26-fifa-26-player-data"
             target="_blank"
             rel="noreferrer"
           >
-            Dataset ↗
+            Current dataset ↗
           </a>
         </div>
       </footer>
