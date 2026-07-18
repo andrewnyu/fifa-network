@@ -1002,6 +1002,13 @@ main {
   color: #a53838;
 }
 
+.profile-owner-note {
+  color: #71817b;
+  font-size: 9px;
+  line-height: 1.45;
+  margin: 9px 2px 0;
+}
+
 .network-panel {
   background:
     radial-gradient(circle at 50% 45%, rgba(95, 226, 188, 0.08), transparent 34%),
@@ -2286,7 +2293,8 @@ footer > div a:hover {
   }
 
   .join-card-toggle small,
-  .profile-message {
+  .profile-message,
+  .profile-owner-note {
     font-size: 11px;
   }
 

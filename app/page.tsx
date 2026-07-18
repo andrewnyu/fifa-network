@@ -413,13 +413,16 @@ function PeoplePicker({
 
   useEffect(() => {
     const normalized = query.trim();
-    if (normalized.length < 2) {
+    if (normalized.length === 1) {
       return;
     }
 
     const controller = new AbortController();
     const timeout = window.setTimeout(() => {
-      fetch(`/api/people?q=${encodeURIComponent(normalized)}`, {
+      const endpoint = normalized
+        ? `/api/people?q=${encodeURIComponent(normalized)}`
+        : "/api/people?recent=1";
+      fetch(endpoint, {
         signal: controller.signal,
       })
         .then(async (response) => {
@@ -429,7 +432,6 @@ function PeoplePicker({
         .then((payload) => {
           setPeople(payload.people);
           setUnavailable(false);
-          setOpen(true);
         })
         .catch((error: Error) => {
           if (error.name !== "AbortError") {
@@ -470,7 +472,7 @@ function PeoplePicker({
           autoComplete="off"
         />
       </div>
-      {open && query.trim().length >= 2 && (
+      {open && query.trim().length !== 1 && (
         <div className="people-results">
           {people.map((person) => {
             const linkedNames = person.playerIds
@@ -497,7 +499,7 @@ function PeoplePicker({
             );
           })}
           {!unavailable && people.length === 0 && (
-            <p>No shared profiles found.</p>
+            <p>{query.trim() ? "No shared profiles found." : "No community profiles yet."}</p>
           )}
           {unavailable && <p>Community search needs the shared database.</p>}
         </div>
@@ -1088,6 +1090,12 @@ export default function Home() {
                     {profileMessage && (
                       <p className={`profile-message ${profileStatus}`} role="status">
                         {profileMessage}
+                      </p>
+                    )}
+                    {visitor.id && (
+                      <p className="profile-owner-note">
+                        This updates {visitor.name}. A different person should create
+                        their own profile on their device.
                       </p>
                     )}
                   </>

@@ -52,9 +52,10 @@ export async function GET(request: Request) {
   try {
     const url = new URL(request.url);
     const slug = url.searchParams.get("slug")?.trim();
+    const recent = url.searchParams.get("recent") === "1";
     const query = normalizeSearchName(url.searchParams.get("q") ?? "");
 
-    if (!slug && query.length < 2) {
+    if (!slug && !recent && query.length < 2) {
       return NextResponse.json({ people: [] });
     }
 
@@ -73,7 +74,19 @@ export async function GET(request: Request) {
           GROUP BY p.id
           LIMIT 1
         `
-      : await sql`
+      : recent
+        ? await sql`
+          SELECT p.id::text, p.slug, p.display_name,
+            COALESCE(array_agg(l.player_id ORDER BY l.position)
+              FILTER (WHERE l.player_id IS NOT NULL), '{}') AS player_ids,
+            p.updated_at
+          FROM people p
+          LEFT JOIN person_player_links l ON l.person_id = p.id
+          GROUP BY p.id
+          ORDER BY p.updated_at DESC
+          LIMIT 12
+        `
+        : await sql`
           SELECT p.id::text, p.slug, p.display_name,
             COALESCE(array_agg(l.player_id ORDER BY l.position)
               FILTER (WHERE l.player_id IS NOT NULL), '{}') AS player_ids,
