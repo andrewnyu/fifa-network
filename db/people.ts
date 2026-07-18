@@ -36,9 +36,14 @@ export function normalizeDisplayName(value: unknown) {
 
 export function normalizeSearchName(value: string) {
   return value
+    .toLocaleLowerCase()
+    .replaceAll("ß", "ss")
+    .replaceAll("æ", "ae")
+    .replaceAll("œ", "oe")
+    .replace(/[øłđð]/g, (character) => ({ ø: "o", ł: "l", đ: "d", ð: "d" })[character] ?? character)
+    .replaceAll("þ", "th")
     .normalize("NFKD")
     .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase()
     .replace(/[^\p{L}\p{N}\s'-]/gu, "")
     .replace(/\s+/g, " ")
     .trim();

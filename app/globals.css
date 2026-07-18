@@ -586,6 +586,36 @@ main {
   text-transform: uppercase;
 }
 
+.source-selector {
+  position: relative;
+  z-index: 10;
+}
+
+.source-mode-tabs {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 9px;
+}
+
+.source-mode-tabs button {
+  background: #e8e8e1;
+  border: 0;
+  border-radius: 999px;
+  color: #65736e;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.08em;
+  min-height: 26px;
+  padding: 0 10px;
+  text-transform: uppercase;
+}
+
+.source-mode-tabs button.active {
+  background: var(--ink);
+  color: var(--lime);
+}
+
 .use-profile {
   align-items: center;
   background: transparent;
@@ -596,7 +626,7 @@ main {
   font-size: 11px;
   font-weight: 750;
   gap: 8px;
-  margin: 12px 0 -2px;
+  margin: 0 0 12px;
   padding: 0;
 }
 
@@ -605,7 +635,7 @@ main {
 }
 
 .people-picker {
-  margin-top: 14px;
+  margin: 0;
   position: relative;
   z-index: 5;
 }
@@ -651,10 +681,15 @@ main {
   border-radius: 10px;
   box-shadow: 0 20px 45px rgba(20, 37, 31, 0.18);
   left: 0;
+  margin-top: 5px;
+  max-height: min(360px, 48svh);
+  overflow-y: auto;
+  overscroll-behavior: contain;
   padding: 5px;
   position: absolute;
   right: 0;
-  top: calc(100% + 5px);
+  top: 100%;
+  z-index: 30;
 }
 
 .people-results button {
@@ -873,6 +908,11 @@ main {
   width: 34px;
 }
 
+.link-editor {
+  border-bottom: 1px solid var(--line);
+  padding-bottom: 13px;
+}
+
 .add-link-button {
   background: var(--ink);
   border: 0;
@@ -918,6 +958,20 @@ main {
   padding: 6px 9px;
 }
 
+.add-another-link {
+  background: transparent;
+  border: 1px solid #b8c1bd;
+  border-radius: 8px;
+  color: #50615a;
+  cursor: pointer;
+  font-size: 8px;
+  font-weight: 850;
+  letter-spacing: 0.09em;
+  margin-top: 10px;
+  min-height: 34px;
+  width: 100%;
+}
+
 .save-profile-button {
   background: var(--blue);
   border: 0;
@@ -960,9 +1014,18 @@ main {
 }
 
 .network-toolbar {
+  display: flex;
+  justify-content: space-between;
   padding: 0 38px;
   position: relative;
   z-index: 2;
+}
+
+.network-meta {
+  align-items: flex-end;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
 .network-toolbar h2 {
@@ -986,6 +1049,36 @@ main {
   color: white;
   font-family: var(--font-geist-mono), monospace;
   font-weight: 700;
+}
+
+.path-resize {
+  align-items: center;
+  display: flex;
+  gap: 8px;
+}
+
+.path-resize label {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 7px;
+  font-weight: 850;
+  letter-spacing: 0.1em;
+}
+
+.path-resize input {
+  accent-color: var(--lime);
+  width: 90px;
+}
+
+.path-resize button {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.28);
+  border-radius: 999px;
+  color: var(--lime);
+  cursor: pointer;
+  font-size: 7px;
+  font-weight: 850;
+  min-height: 24px;
+  padding: 0 9px;
 }
 
 .pitch-lines {
@@ -1065,7 +1158,9 @@ main {
   bottom: 84px;
   display: flex;
   left: 0;
-  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  overflow: auto;
+  overscroll-behavior: contain;
   padding: 40px 42px;
   position: absolute;
   right: 0;
@@ -1079,6 +1174,13 @@ main {
   display: flex;
   margin: auto;
   min-width: min-content;
+  transform-origin: top left;
+}
+
+.path-scale-shell {
+  flex: 0 0 auto;
+  margin: auto;
+  position: relative;
 }
 
 .path-segment {
@@ -1919,6 +2021,10 @@ footer > div a:hover {
 }
 
 @media (max-width: 780px) {
+  body {
+    overflow-x: hidden;
+  }
+
   .site-header {
     grid-template-columns: 1fr auto;
     height: 68px;
@@ -1931,6 +2037,15 @@ footer > div a:hover {
 
   .header-join {
     font-size: 0;
+    justify-content: center;
+    min-height: 44px;
+    min-width: 44px;
+    padding: 0;
+  }
+
+  .header-join span {
+    height: 34px;
+    width: 34px;
   }
 
   .hero {
@@ -1972,11 +2087,143 @@ footer > div a:hover {
   }
 
   .control-panel {
-    padding: 27px 20px 32px;
+    padding: 24px 16px 30px;
+  }
+
+  .panel-heading {
+    margin-bottom: 22px;
+    padding-bottom: 19px;
+  }
+
+  .panel-heading h2,
+  .network-toolbar h2 {
+    font-size: 26px;
+  }
+
+  .source-mode-tabs {
+    display: grid;
+    grid-template-columns: minmax(88px, 0.7fr) minmax(0, 1.3fr);
+    margin-bottom: 12px;
+  }
+
+  .source-mode-tabs button {
+    font-size: 9px;
+    min-height: 44px;
+    padding: 0 12px;
+  }
+
+  .picker > label,
+  .join-form > label,
+  .people-picker > label {
+    font-size: 10px;
+    margin-bottom: 8px;
+  }
+
+  .picker-field {
+    min-height: 62px;
+  }
+
+  .picker-field input,
+  .people-field input {
+    font-size: 16px;
+  }
+
+  .suggestions {
+    max-height: min(380px, 52svh);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+
+  .suggestions button,
+  .people-results button {
+    min-height: 56px;
+    padding: 9px;
+  }
+
+  .suggestion-copy strong,
+  .people-results strong {
+    font-size: 13px;
+  }
+
+  .suggestion-copy small,
+  .people-results small {
+    font-size: 10px;
+  }
+
+  .suggestion-rating {
+    font-size: 12px;
+  }
+
+  .people-field {
+    min-height: 56px;
+  }
+
+  .swap-row {
+    margin: 9px 0;
+  }
+
+  .swap-row button {
+    font-size: 18px;
+    height: 44px;
+    width: 44px;
+  }
+
+  .trace-button {
+    font-size: 12px;
+    min-height: 56px;
+  }
+
+  .route-summary {
+    padding: 16px 2px 20px;
+  }
+
+  .route-summary span {
+    font-size: 9px;
+  }
+
+  .route-summary strong {
+    font-size: 19px;
+  }
+
+  .join-card-toggle {
+    min-height: 64px;
+  }
+
+  .join-card-toggle strong {
+    font-size: 16px;
+  }
+
+  .join-card-toggle small,
+  .profile-message {
+    font-size: 11px;
+  }
+
+  .name-input,
+  .join-form .picker-field {
+    font-size: 16px;
+    min-height: 52px;
+  }
+
+  .add-link-button,
+  .add-another-link,
+  .save-profile-button {
+    font-size: 10px;
+    min-height: 48px;
+  }
+
+  .linked-list > span {
+    font-size: 9px;
+  }
+
+  .linked-list button {
+    font-size: 11px;
+    min-height: 40px;
+    padding: 8px 12px;
   }
 
   .network-panel {
-    min-height: 700px;
+    height: max(760px, 100svh);
+    min-height: 760px;
     padding-top: 30px;
   }
 
@@ -1986,14 +2233,46 @@ footer > div a:hover {
     padding: 0 22px;
   }
 
+  .network-meta {
+    align-items: stretch;
+    gap: 12px;
+    width: 100%;
+  }
+
   .network-stats {
+    justify-content: space-between;
     padding-top: 0;
   }
 
+  .network-stats span {
+    font-size: 9px;
+  }
+
+  .path-resize {
+    gap: 12px;
+    width: 100%;
+  }
+
+  .path-resize label {
+    font-size: 9px;
+  }
+
+  .path-resize input {
+    flex: 1;
+    min-width: 80px;
+    width: auto;
+  }
+
+  .path-resize button {
+    font-size: 9px;
+    min-height: 44px;
+    min-width: 54px;
+  }
+
   .path-scroll {
-    bottom: 76px;
-    padding: 35px 22px;
-    top: 118px;
+    bottom: 82px;
+    padding: 28px 18px;
+    top: 176px;
   }
 
   .path-track {
@@ -2008,9 +2287,9 @@ footer > div a:hover {
 
   .player-node,
   .path-segment:nth-child(n) .player-node {
-    min-height: 205px;
+    min-height: 220px;
     transform: none;
-    width: 210px;
+    width: 224px;
   }
 
   .connection {
@@ -2052,14 +2331,29 @@ footer > div a:hover {
     border-top-color: #8599ff;
   }
 
+  .connection-label strong {
+    font-size: 8px;
+  }
+
+  .connection-label small {
+    font-size: 9px;
+  }
+
   .map-legend {
-    gap: 12px;
+    gap: 8px;
+    height: 78px;
+    justify-content: space-between;
     left: 20px;
     right: 20px;
   }
 
   .map-legend span {
     font-size: 7px;
+    gap: 5px;
+  }
+
+  .map-legend i {
+    flex: 0 0 auto;
   }
 
   .pitch-lines {
@@ -2097,6 +2391,11 @@ footer > div a:hover {
 
   .reach-chart-panel {
     padding: 26px 18px 24px;
+  }
+
+  .reach-chart-panel,
+  .reach-profile {
+    min-width: 0;
   }
 
   .reach-chart-header span:last-child {
@@ -2166,6 +2465,64 @@ footer > div a:hover {
 
   footer > div {
     justify-self: start;
+  }
+}
+
+@media (max-width: 420px) {
+  .site-header {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .brand {
+    font-size: 13px;
+    gap: 8px;
+  }
+
+  .hero {
+    gap: 34px;
+    padding: 48px 18px;
+  }
+
+  .hero h1 {
+    font-size: clamp(48px, 14.5vw, 62px);
+  }
+
+  .control-panel {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .source-mode-tabs button {
+    font-size: 8px;
+    padding: 0 8px;
+  }
+
+  .network-toolbar {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+
+  .path-scroll {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .degree-chart li {
+    gap: 8px;
+    grid-template-columns: 58px minmax(54px, 1fr) 88px;
+  }
+
+  .degree-label strong {
+    font-size: 21px;
+  }
+
+  .degree-value strong {
+    font-size: 10px;
+  }
+
+  .method-grid article {
+    padding-left: 78px;
   }
 }
 

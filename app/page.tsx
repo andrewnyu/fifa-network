@@ -80,9 +80,28 @@ type DistanceStats = {
   outsideSix: number;
 };
 
-const DEFAULT_SOURCE_ID = 158023; // Lionel Messi
-const DEFAULT_TARGET_ID = 202126; // Harry Kane
+const DEFAULT_SOURCE_ID = 239085; // Erling Haaland
+const DEFAULT_TARGET_ID = 158023; // Lionel Messi
 const PROFILE_KEY = "the-pass-profile-v1";
+const SEARCH_CHARACTER_FOLD: Record<string, string> = {
+  ø: "o",
+  ł: "l",
+  đ: "d",
+  ð: "d",
+};
+
+function normalizeSearchText(value: string) {
+  return value
+    .toLocaleLowerCase()
+    .replaceAll("ß", "ss")
+    .replaceAll("æ", "ae")
+    .replaceAll("œ", "oe")
+    .replace(/[øłđð]/g, (character) => SEARCH_CHARACTER_FOLD[character])
+    .replaceAll("þ", "th")
+    .normalize("NFKD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}]+/gu, "");
+}
 
 function buildSearchableGraph(payload: GraphPayload): SearchableGraph {
   const playerGroups = Array.from(
@@ -100,9 +119,9 @@ function buildSearchableGraph(payload: GraphPayload): SearchableGraph {
     playerIdToIndex: new Map(
       payload.players.map((player, index) => [player.id, index]),
     ),
-    searchText: payload.players.map((player) =>
-      `${player.shortName} ${player.longName} ${player.club} ${player.nationality}`.toLocaleLowerCase(),
-    ),
+    searchText: payload.players.map((player) => normalizeSearchText(
+      `${player.shortName} ${player.longName} ${player.club} ${player.nationality}`,
+    )),
   };
 }
 
@@ -264,15 +283,15 @@ function PlayerPicker({
   const [open, setOpen] = useState(false);
 
   const suggestions = useMemo(() => {
-    const normalized = query.trim().toLocaleLowerCase();
+    const normalized = normalizeSearchText(query);
     if (normalized.length < 2) return [];
 
     const matches: { index: number; score: number }[] = [];
     graph.searchText.forEach((searchable, index) => {
       if (!searchable.includes(normalized)) return;
       const player = graph.players[index];
-      const short = player.shortName.toLocaleLowerCase();
-      const long = player.longName.toLocaleLowerCase();
+      const short = normalizeSearchText(player.shortName);
+      const long = normalizeSearchText(player.longName);
       const score = short.startsWith(normalized)
         ? 0
         : long.startsWith(normalized)
@@ -318,6 +337,7 @@ function PlayerPicker({
         </span>
         <input
           id={id}
+          type="search"
           value={query}
           onChange={(event) => {
             onQueryChange(event.target.value);
@@ -373,9 +393,11 @@ function PlayerPicker({
 function PeoplePicker({
   graph,
   onSelect,
+  label = "FROM A PERSON",
 }: {
   graph: SearchableGraph;
   onSelect: (person: PublicPerson) => void;
+  label?: string;
 }) {
   const [query, setQuery] = useState("");
   const [people, setPeople] = useState<PublicPerson[]>([]);
@@ -424,11 +446,12 @@ function PeoplePicker({
 
   return (
     <div className="people-picker">
-      <label htmlFor="community-person">OR START FROM A PERSON</label>
+      <label htmlFor="community-person">{label}</label>
       <div className="people-field">
         <span aria-hidden="true">⌕</span>
         <input
           id="community-person"
+          type="search"
           value={query}
           onChange={(event) => {
             setQuery(event.target.value);
@@ -501,7 +524,9 @@ export default function Home() {
     linkedPlayerIds: [],
   });
   const [communityPerson, setCommunityPerson] = useState<PublicPerson | null>(null);
+  const [sourcePickerMode, setSourcePickerMode] = useState<"player" | "person">("player");
   const [joinOpen, setJoinOpen] = useState(false);
+  const [linkEditorOpen, setLinkEditorOpen] = useState(false);
   const [linkQuery, setLinkQuery] = useState("");
   const [linkCandidateIndex, setLinkCandidateIndex] = useState(-1);
   const [profileStatus, setProfileStatus] = useState<
@@ -509,7 +534,12 @@ export default function Home() {
   >("idle");
   const [profileMessage, setProfileMessage] = useState("");
   const [routePulse, setRoutePulse] = useState(0);
+  const [pathScale, setPathScale] = useState(1);
+  const [pathSize, setPathSize] = useState({ width: 0, height: 0 });
+  const [fitRevision, setFitRevision] = useState(0);
   const profileLoaded = useRef(false);
+  const pathViewportRef = useRef<HTMLDivElement>(null);
+  const pathTrackRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -599,6 +629,33 @@ export default function Home() {
     ? route.eventIds.length + (route.fromPerson ? 1 : 0)
     : 0;
 
+  useEffect(() => {
+    if (!route) return;
+    const viewport = pathViewportRef.current;
+    const track = pathTrackRef.current;
+    if (!viewport || !track) return;
+
+    const fit = () => {
+      const width = track.scrollWidth;
+      const height = track.scrollHeight;
+      if (!width || !height) return;
+      setPathSize({ width, height });
+      setPathScale(Math.min(
+        1,
+        Math.max(0.1, (viewport.clientWidth - 56) / width),
+        Math.max(0.1, (viewport.clientHeight - 36) / height),
+      ));
+    };
+
+    const frame = window.requestAnimationFrame(fit);
+    const observer = new ResizeObserver(fit);
+    observer.observe(viewport);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      observer.disconnect();
+    };
+  }, [fitRevision, route]);
+
   const distanceStats = useMemo(
     () => (graph ? calculateDistanceStats(graph, statsPlayerIndex) : null),
     [graph, statsPlayerIndex],
@@ -624,12 +681,14 @@ export default function Home() {
     setProfileMessage("");
     setLinkQuery("");
     setLinkCandidateIndex(-1);
+    setLinkEditorOpen(false);
     setSourceMode("visitor");
     setJoinOpen(true);
   };
 
   const prepareVisitorLink = (playerIndex: number) => {
     setJoinOpen(true);
+    setLinkEditorOpen(true);
     setLinkCandidateIndex(playerIndex);
     setLinkQuery(graph?.players[playerIndex].shortName ?? "");
     if (visitor.name.trim()) addVisitorLink(playerIndex);
@@ -791,19 +850,59 @@ export default function Home() {
                       {sourceLinkedIndexes.length === 1 ? "" : "s"}
                     </em>
                   </span>
-                  <button type="button" onClick={() => setSourceMode("player")}>Change</button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSourceMode("player");
+                      setSourcePickerMode("player");
+                    }}
+                  >
+                    Change
+                  </button>
                 </div>
               ) : (
-                <PlayerPicker
-                  id="source-player"
-                  label="FROM"
-                  graph={graph}
-                  selectedIndex={sourceIndex}
-                  query={sourceQuery}
-                  onQueryChange={setSourceQuery}
-                  onSelect={setSourceIndex}
-                  placeholder="Search a player"
-                />
+                <div className="source-selector">
+                  <div className="source-mode-tabs" aria-label="Choose who to start from">
+                    <button
+                      type="button"
+                      className={sourcePickerMode === "player" ? "active" : ""}
+                      aria-pressed={sourcePickerMode === "player"}
+                      onClick={() => setSourcePickerMode("player")}
+                    >
+                      Player
+                    </button>
+                    <button
+                      type="button"
+                      className={sourcePickerMode === "person" ? "active" : ""}
+                      aria-pressed={sourcePickerMode === "person"}
+                      onClick={() => setSourcePickerMode("person")}
+                    >
+                      Community profiles
+                    </button>
+                  </div>
+
+                  {sourcePickerMode === "player" ? (
+                    <PlayerPicker
+                      id="source-player"
+                      label="FROM"
+                      graph={graph}
+                      selectedIndex={sourceIndex}
+                      query={sourceQuery}
+                      onQueryChange={setSourceQuery}
+                      onSelect={setSourceIndex}
+                      placeholder="Search a player"
+                    />
+                  ) : (
+                    <PeoplePicker
+                      graph={graph}
+                      label="FROM A COMMUNITY PROFILE"
+                      onSelect={(person) => {
+                        setCommunityPerson(person);
+                        setSourceMode("community");
+                      }}
+                    />
+                  )}
+                </div>
               )}
 
               <div className="swap-row" aria-hidden="true">
@@ -831,28 +930,6 @@ export default function Home() {
                 placeholder="Search a player"
               />
 
-              {visitor.linkedPlayerIds.length > 0 && sourceMode === "player" && (
-                <button
-                  type="button"
-                  className="use-profile"
-                  onClick={() => setSourceMode("visitor")}
-                >
-                  <span className="mini-avatar">{getInitials(visitor.name)}</span>
-                  Start from {visitor.name}
-                  <span aria-hidden="true">→</span>
-                </button>
-              )}
-
-              {sourceMode === "player" && (
-                <PeoplePicker
-                  graph={graph}
-                  onSelect={(person) => {
-                    setCommunityPerson(person);
-                    setSourceMode("community");
-                  }}
-                />
-              )}
-
               <button type="button" className="trace-button" onClick={traceRoute}>
                 TRACE THE LINK <span aria-hidden="true">→</span>
               </button>
@@ -878,7 +955,12 @@ export default function Home() {
             <button
               type="button"
               className="join-card-toggle"
-              onClick={() => setJoinOpen((open) => !open)}
+              onClick={() => {
+                setJoinOpen((open) => {
+                  if (open) setLinkEditorOpen(false);
+                  return !open;
+                });
+              }}
               aria-expanded={joinOpen}
             >
               <span className="join-plus" aria-hidden="true">+</span>
@@ -904,29 +986,33 @@ export default function Home() {
                   placeholder="e.g. Andrew"
                 />
 
-                <PlayerPicker
-                  id="linked-player"
-                  label="PLAYER YOU KNOW"
-                  graph={graph}
-                  selectedIndex={linkCandidateIndex}
-                  query={linkQuery}
-                  onQueryChange={setLinkQuery}
-                  onSelect={setLinkCandidateIndex}
-                  placeholder="Search for a player"
-                />
+                {(linkedIndexes.length === 0 || linkEditorOpen) && (
+                  <div className="link-editor">
+                    <PlayerPicker
+                      id="linked-player"
+                      label="PLAYER YOU KNOW"
+                      graph={graph}
+                      selectedIndex={linkCandidateIndex}
+                      query={linkQuery}
+                      onQueryChange={setLinkQuery}
+                      onSelect={setLinkCandidateIndex}
+                      placeholder="Search names without accents"
+                    />
 
-                <button
-                  type="button"
-                  className="add-link-button"
-                  onClick={() => addVisitorLink()}
-                  disabled={
-                    !visitor.name.trim() ||
-                    linkCandidateIndex < 0 ||
-                    visitor.linkedPlayerIds.length >= 12
-                  }
-                >
-                  ADD MY CONNECTION
-                </button>
+                    <button
+                      type="button"
+                      className="add-link-button"
+                      onClick={() => addVisitorLink()}
+                      disabled={
+                        !visitor.name.trim() ||
+                        linkCandidateIndex < 0 ||
+                        visitor.linkedPlayerIds.length >= 12
+                      }
+                    >
+                      ADD MY CONNECTION
+                    </button>
+                  </div>
+                )}
 
                 {linkedIndexes.length > 0 && (
                   <>
@@ -946,6 +1032,19 @@ export default function Home() {
                         );
                       })}
                     </div>
+                    {linkedIndexes.length < 12 && !linkEditorOpen && (
+                      <button
+                        type="button"
+                        className="add-another-link"
+                        onClick={() => {
+                          setLinkQuery("");
+                          setLinkCandidateIndex(-1);
+                          setLinkEditorOpen(true);
+                        }}
+                      >
+                        + CONNECT ANOTHER PLAYER
+                      </button>
+                    )}
                     <button
                       type="button"
                       className="save-profile-button"
@@ -984,9 +1083,27 @@ export default function Home() {
               <h2>The shortest path</h2>
             </div>
             {graph && (
-              <div className="network-stats">
-                <span><strong>{formatNumber(graph.meta.playerCount)}</strong> players</span>
-                <span><strong>{graph.meta.years.length}</strong> editions</span>
+              <div className="network-meta">
+                <div className="network-stats">
+                  <span><strong>{formatNumber(graph.meta.playerCount)}</strong> players</span>
+                  <span><strong>{graph.meta.years.length}</strong> editions</span>
+                </div>
+                {route && (
+                  <div className="path-resize">
+                    <label htmlFor="path-size">PATH SIZE</label>
+                    <input
+                      id="path-size"
+                      type="range"
+                      min="10"
+                      max="125"
+                      value={Math.round(pathScale * 100)}
+                      onChange={(event) => setPathScale(Number(event.target.value) / 100)}
+                    />
+                    <button type="button" onClick={() => setFitRevision((value) => value + 1)}>
+                      FIT
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>
@@ -994,8 +1111,23 @@ export default function Home() {
           {!graph && !loadError && <LoadingMap />}
 
           {graph && route && (
-            <div className="path-scroll" key={`${sourceMode}-${sourceIndex}-${targetIndex}-${routePulse}`}>
-              <div className="path-track">
+            <div
+              className="path-scroll"
+              key={`${sourceMode}-${sourceIndex}-${targetIndex}-${routePulse}`}
+              ref={pathViewportRef}
+            >
+              <div
+                className="path-scale-shell"
+                style={{
+                  height: pathSize.height ? pathSize.height * pathScale : undefined,
+                  width: pathSize.width ? pathSize.width * pathScale : undefined,
+                }}
+              >
+              <div
+                className="path-track"
+                ref={pathTrackRef}
+                style={{ transform: `scale(${pathScale})` }}
+              >
                 {route.fromPerson && (
                   <>
                     <article className="player-node visitor-node">
@@ -1076,6 +1208,7 @@ export default function Home() {
                     </div>
                   );
                 })}
+              </div>
               </div>
             </div>
           )}
