@@ -45,6 +45,7 @@ type SearchableGraph = GraphPayload & {
   playerGroups: number[][];
   playerIdToIndex: Map<number, number>;
   searchText: string[];
+  searchNames: string[][];
 };
 
 type Route = {
@@ -103,6 +104,42 @@ function normalizeSearchText(value: string) {
     .replace(/[^\p{L}\p{N}]+/gu, "");
 }
 
+function isOneEditAway(left: string, right: string) {
+  if (Math.abs(left.length - right.length) > 1) return false;
+  let leftIndex = 0;
+  let rightIndex = 0;
+  let edits = 0;
+
+  while (leftIndex < left.length && rightIndex < right.length) {
+    if (left[leftIndex] === right[rightIndex]) {
+      leftIndex += 1;
+      rightIndex += 1;
+      continue;
+    }
+    edits += 1;
+    if (edits > 1) return false;
+    if (left.length > right.length) leftIndex += 1;
+    else if (right.length > left.length) rightIndex += 1;
+    else {
+      leftIndex += 1;
+      rightIndex += 1;
+    }
+  }
+
+  return edits + Number(leftIndex < left.length || rightIndex < right.length) <= 1;
+}
+
+function playerNameAliases(player: Player) {
+  const longParts = player.longName.split(/\s+/).filter(Boolean);
+  return Array.from(new Set([
+    normalizeSearchText(player.shortName),
+    normalizeSearchText(player.longName),
+    longParts.length > 1
+      ? normalizeSearchText(`${longParts[0]} ${longParts[longParts.length - 1]}`)
+      : normalizeSearchText(player.longName),
+  ].filter(Boolean)));
+}
+
 function buildSearchableGraph(payload: GraphPayload): SearchableGraph {
   const playerGroups = Array.from(
     { length: payload.players.length },
@@ -122,6 +159,7 @@ function buildSearchableGraph(payload: GraphPayload): SearchableGraph {
     searchText: payload.players.map((player) => normalizeSearchText(
       `${player.shortName} ${player.longName} ${player.club} ${player.nationality}`,
     )),
+    searchNames: payload.players.map(playerNameAliases),
   };
 }
 
@@ -293,19 +331,35 @@ function PlayerPicker({
 
     const matches: { index: number; score: number }[] = [];
     graph.searchText.forEach((searchable, index) => {
-      if (!searchable.includes(normalized)) return;
       const player = graph.players[index];
       const short = normalizeSearchText(player.shortName);
       const long = normalizeSearchText(player.longName);
+      const names = graph.searchNames[index];
+      if (
+        !searchable.includes(normalized) &&
+        !names.some((name) => name.includes(normalized))
+      ) return;
       const score = short.startsWith(normalized)
         ? 0
         : long.startsWith(normalized)
           ? 1
-          : short.includes(normalized)
+          : names.some((name) => name.startsWith(normalized))
             ? 2
-            : 3;
+          : short.includes(normalized)
+            ? 3
+            : 4;
       matches.push({ index, score });
     });
+
+    if (normalized.length >= 4 && matches.length < 7) {
+      const matchedIndexes = new Set(matches.map((match) => match.index));
+      graph.searchNames.forEach((names, index) => {
+        if (matchedIndexes.has(index)) return;
+        if (names.some((name) => isOneEditAway(normalized, name))) {
+          matches.push({ index, score: 5 });
+        }
+      });
+    }
 
     return matches
       .sort(
@@ -837,6 +891,9 @@ export default function Home() {
             Pick any two footballers. We&apos;ll trace the shortest chain of
             teammates connecting them—club by club, country by country.
           </p>
+          <a className="hero-how-link" href="#method">
+            How it works &amp; data sources <span aria-hidden="true">↓</span>
+          </a>
         </div>
         <div className="hero-stat" aria-label="Key finding from the original analysis">
           <span className="stat-kicker">THE BIG FINDING</span>
@@ -1433,30 +1490,41 @@ export default function Home() {
           <p className="eyebrow"><span /> THE RULES OF THE GRAPH</p>
           <h2>One shared dressing room<br />is all it takes.</h2>
           <p>
-            The original notebook&apos;s breadth-first search is now an interactive,
-            explainable route finder. Each step is a direct real-world team link.
+            Choose a FROM and TO player, then trace the link. The original
+            notebook&apos;s breadth-first search checks the graph and explains every hop.
           </p>
         </div>
 
-        <div className="method-grid">
-          <article>
-            <span>01</span>
-            <div className="method-icon club-icon" aria-hidden="true"><i /><i /></div>
-            <h3>Club teammates</h3>
-            <p>Two players connect when they appeared for the same club in the same FIFA edition.</p>
-          </article>
-          <article>
-            <span>02</span>
-            <div className="method-icon nation-icon" aria-hidden="true">★</div>
-            <h3>National squads</h3>
-            <p>Called-up internationals connect by year, with sourced Philippine tournament and qualifier cohorts.</p>
-          </article>
-          <article>
-            <span>03</span>
-            <div className="method-icon route-icon" aria-hidden="true"><i /><i /><i /></div>
-            <h3>Shortest route</h3>
-            <p>Breadth-first search checks every valid path and returns the chain with the fewest hops.</p>
-          </article>
+        <div className="method-content">
+          <div className="method-grid">
+            <article>
+              <span>01</span>
+              <div className="method-icon club-icon" aria-hidden="true"><i /><i /></div>
+              <h3>Club teammates</h3>
+              <p>Two players connect when they appeared for the same club in the same FIFA edition.</p>
+            </article>
+            <article>
+              <span>02</span>
+              <div className="method-icon nation-icon" aria-hidden="true">★</div>
+              <h3>National squads</h3>
+              <p>Called-up internationals connect by year, including sourced Philippine squad cohorts.</p>
+            </article>
+            <article>
+              <span>03</span>
+              <div className="method-icon route-icon" aria-hidden="true"><i /><i /><i /></div>
+              <h3>Breadth-first search</h3>
+              <p>BFS explores the graph layer by layer and returns the valid route with the fewest hops.</p>
+            </article>
+            <article>
+              <span>04</span>
+              <div className="method-icon data-icon" aria-hidden="true">15—26</div>
+              <h3>Public data</h3>
+              <p>Kaggle player datasets cover FIFA 15 through EA FC 26, supplemented by sourced squad records.</p>
+            </article>
+          </div>
+          <a className="method-cta" href="#explorer">
+            Find a connection <span aria-hidden="true">↑</span>
+          </a>
         </div>
       </section>
 
