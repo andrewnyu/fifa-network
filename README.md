@@ -3,7 +3,8 @@
 An interactive continuation of the Kaggle notebook
 [Six Degrees of (FIFA 15–21) Separation](https://www.kaggle.com/code/andnyu/six-degrees-of-fifa-15-21-separation).
 Search any two players to see the shortest explainable chain of club and
-national-team links between them, or add yourself by naming a player you know.
+national-team links between them. People can also publish a searchable profile
+with up to 12 direct player connections and use those profiles as route starts.
 
 ## Run locally
 
@@ -16,10 +17,18 @@ npm run dev
 
 Open the local URL printed by the development server.
 
+Player routes work without a database. Shared people profiles use serverless
+Postgres. For the complete local experience, create a Neon database, copy
+`.env.example` to `.env.local`, set `DATABASE_URL`, then run:
+
+```bash
+npm run db:migrate:people
+```
+
 ## Graph model
 
 The precomputed browser graph is stored at `public/fifa-graph.json`. It contains
-59,968 players and 9,243 compact club-edition or national-team-edition groups
+60,065 players and 9,258 compact club-edition or national-team-edition groups
 from FIFA 15 through EA Sports FC 26. The UI runs breadth-first search over
 those groups and shows the group that explains every hop.
 
@@ -29,6 +38,16 @@ Connections follow the notebook's stated rules:
 - same called-up national team in the same edition;
 - for countries without a FIFA squad, the top 30 players by overall rating are
   treated as the national squad.
+- Philippines links also include 11 historical tournament squads and four
+  World Cup qualifying scorer cohorts sourced from their Wikipedia pages.
+
+The supplemental Philippines data contains 271 sourced memberships covering
+118 players. It is committed at `data/philippines_squads.csv`; every row retains
+its source URL. Rebuild it from the current Wikipedia pages with:
+
+```bash
+python3 scripts/build_philippines_squads.py data/philippines_squads.csv
+```
 
 The current build combines these public Kaggle datasets:
 
@@ -44,6 +63,24 @@ python3 scripts/build_graph.py /path/to/male_players.csv public/fifa-graph.json 
   --fc25 /path/to/new-players-data-full.csv \
   --fc26 /path/to/FC26_20250921.csv
 ```
+
+## Deploy to Vercel
+
+The repository includes `vercel.json` and a separately validated native Next.js
+build so Vercel does not invoke the Cloudflare/vinext build target.
+
+1. Import the GitHub repository in Vercel.
+2. Add Neon from the Vercel Marketplace, or set `DATABASE_URL` manually for
+   Production, Preview, and Development.
+3. Pull that environment locally and initialize the profile tables once:
+
+```bash
+npx vercel env pull .env.local
+npm run db:migrate:people
+```
+
+Vercel then builds with `npm run build:vercel`; pushes to the connected branch
+create new deployments.
 
 ## Validate
 

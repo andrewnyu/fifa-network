@@ -55,6 +55,21 @@ test("the generated graph is complete and internally consistent", async () => {
   assert.ok(graph.players.length > 59_000);
   assert.ok(graph.events.length > 9_000);
 
+  const philippinesEvents = graph.events.filter((event) => event.sourceUrl);
+  assert.equal(philippinesEvents.length, 15);
+  assert.ok(
+    philippinesEvents.some(
+      (event) => event.label === "2019 AFC Asian Cup" && event.members.length === 23,
+    ),
+  );
+  assert.ok(
+    philippinesEvents.some(
+      (event) =>
+        event.label === "2022 World Cup qualification (scorers)" &&
+        event.members.length === 8,
+    ),
+  );
+
   for (const event of graph.events) {
     assert.ok(event.members.length >= 2);
     for (const playerIndex of event.members) {

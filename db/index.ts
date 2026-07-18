@@ -1,3 +1,4 @@
+// @ts-expect-error This virtual module exists only in the Cloudflare/vinext runtime.
 import { env } from "cloudflare:workers";
 import { drizzle } from "drizzle-orm/d1";
 import * as schema from "./schema";

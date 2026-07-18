@@ -24,6 +24,8 @@ type ConnectionGroup = {
   kind: "club" | "nation";
   name: string;
   fifaYear: number;
+  label?: string;
+  sourceUrl?: string;
   members: number[];
 };
 
@@ -48,12 +50,23 @@ type SearchableGraph = GraphPayload & {
 type Route = {
   players: number[];
   eventIds: number[];
-  fromVisitor: boolean;
+  fromPerson: boolean;
 };
 
 type VisitorProfile = {
+  id?: string;
+  slug?: string;
+  editToken?: string;
   name: string;
   linkedPlayerIds: number[];
+};
+
+type PublicPerson = {
+  id: string;
+  slug: string;
+  displayName: string;
+  playerIds: number[];
+  updatedAt: string;
 };
 
 type DistanceStats = {
@@ -97,7 +110,7 @@ function findShortestRoute(
   graph: SearchableGraph,
   sourceIndexes: number[],
   targetIndex: number,
-  fromVisitor: boolean,
+  fromPerson: boolean,
 ): Route | null {
   if (sourceIndexes.length === 0 || targetIndex < 0) return null;
 
@@ -149,7 +162,7 @@ function findShortestRoute(
     players.unshift(cursor);
   }
 
-  return { players, eventIds, fromVisitor };
+  return { players, eventIds, fromPerson };
 }
 
 function calculateDistanceStats(
@@ -347,10 +360,116 @@ function PlayerPicker({
                     {player.club || player.nationality} · {player.position}
                   </small>
                 </span>
-                <span className="suggestion-rating">{player.overall}</span>
+                <span className="suggestion-rating">{player.overall || "PH"}</span>
               </button>
             );
           })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function PeoplePicker({
+  graph,
+  onSelect,
+}: {
+  graph: SearchableGraph;
+  onSelect: (person: PublicPerson) => void;
+}) {
+  const [query, setQuery] = useState("");
+  const [people, setPeople] = useState<PublicPerson[]>([]);
+  const [open, setOpen] = useState(false);
+  const [unavailable, setUnavailable] = useState(false);
+
+  useEffect(() => {
+    const normalized = query.trim();
+    if (normalized.length < 2) {
+      return;
+    }
+
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => {
+      fetch(`/api/people?q=${encodeURIComponent(normalized)}`, {
+        signal: controller.signal,
+      })
+        .then(async (response) => {
+          if (!response.ok) throw new Error("People search unavailable");
+          return response.json() as Promise<{ people: PublicPerson[] }>;
+        })
+        .then((payload) => {
+          setPeople(payload.people);
+          setUnavailable(false);
+          setOpen(true);
+        })
+        .catch((error: Error) => {
+          if (error.name !== "AbortError") {
+            setPeople([]);
+            setUnavailable(true);
+          }
+        });
+    }, 250);
+
+    return () => {
+      window.clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [query]);
+
+  const choose = (person: PublicPerson) => {
+    onSelect(person);
+    setQuery(person.displayName);
+    setOpen(false);
+  };
+
+  return (
+    <div className="people-picker">
+      <label htmlFor="community-person">OR START FROM A PERSON</label>
+      <div className="people-field">
+        <span aria-hidden="true">⌕</span>
+        <input
+          id="community-person"
+          value={query}
+          onChange={(event) => {
+            setQuery(event.target.value);
+            setOpen(true);
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+          placeholder="Search community profiles"
+          autoComplete="off"
+        />
+      </div>
+      {open && query.trim().length >= 2 && (
+        <div className="people-results">
+          {people.map((person) => {
+            const linkedNames = person.playerIds
+              .map((id) => graph.playerIdToIndex.get(id))
+              .filter((index): index is number => index !== undefined)
+              .slice(0, 3)
+              .map((index) => graph.players[index].shortName);
+            return (
+              <button
+                type="button"
+                key={person.id}
+                onMouseDown={(event) => event.preventDefault()}
+                onClick={() => choose(person)}
+              >
+                <span>{getInitials(person.displayName)}</span>
+                <span>
+                  <strong>{person.displayName}</strong>
+                  <small>
+                    {linkedNames.join(", ") || `${person.playerIds.length} player links`}
+                  </small>
+                </span>
+                <i aria-hidden="true">→</i>
+              </button>
+            );
+          })}
+          {!unavailable && people.length === 0 && (
+            <p>No shared profiles found.</p>
+          )}
+          {unavailable && <p>Community search needs the shared database.</p>}
         </div>
       )}
     </div>
@@ -376,14 +495,19 @@ export default function Home() {
   const [targetQuery, setTargetQuery] = useState("Harry Kane");
   const [statsPlayerIndex, setStatsPlayerIndex] = useState(-1);
   const [statsQuery, setStatsQuery] = useState("Lionel Messi");
-  const [sourceMode, setSourceMode] = useState<"player" | "visitor">("player");
+  const [sourceMode, setSourceMode] = useState<"player" | "visitor" | "community">("player");
   const [visitor, setVisitor] = useState<VisitorProfile>({
     name: "",
     linkedPlayerIds: [],
   });
+  const [communityPerson, setCommunityPerson] = useState<PublicPerson | null>(null);
   const [joinOpen, setJoinOpen] = useState(false);
   const [linkQuery, setLinkQuery] = useState("");
   const [linkCandidateIndex, setLinkCandidateIndex] = useState(-1);
+  const [profileStatus, setProfileStatus] = useState<
+    "idle" | "saving" | "saved" | "error"
+  >("idle");
+  const [profileMessage, setProfileMessage] = useState("");
   const [routePulse, setRoutePulse] = useState(0);
   const profileLoaded = useRef(false);
 
@@ -416,14 +540,17 @@ export default function Home() {
   }, []);
 
   useEffect(() => {
-    try {
-      const saved = window.localStorage.getItem(PROFILE_KEY);
-      if (saved) setVisitor(JSON.parse(saved) as VisitorProfile);
-    } catch {
-      // A blocked or malformed local profile should never block the explorer.
-    } finally {
-      profileLoaded.current = true;
-    }
+    const timeout = window.setTimeout(() => {
+      try {
+        const saved = window.localStorage.getItem(PROFILE_KEY);
+        if (saved) setVisitor(JSON.parse(saved) as VisitorProfile);
+      } catch {
+        // A blocked or malformed local profile should never block the explorer.
+      } finally {
+        profileLoaded.current = true;
+      }
+    }, 0);
+    return () => window.clearTimeout(timeout);
   }, []);
 
   useEffect(() => {
@@ -438,19 +565,38 @@ export default function Home() {
       .filter((index): index is number => index !== undefined);
   }, [graph, visitor.linkedPlayerIds]);
 
+  const communityLinkedIndexes = useMemo(() => {
+    if (!graph || !communityPerson) return [];
+    return communityPerson.playerIds
+      .map((id) => graph.playerIdToIndex.get(id))
+      .filter((index): index is number => index !== undefined);
+  }, [communityPerson, graph]);
+
+  const sourceLinkedIndexes = useMemo(
+    () => sourceMode === "visitor"
+      ? linkedIndexes
+      : sourceMode === "community"
+        ? communityLinkedIndexes
+        : [],
+    [communityLinkedIndexes, linkedIndexes, sourceMode],
+  );
+  const sourcePersonName = sourceMode === "community"
+    ? communityPerson?.displayName || "Community profile"
+    : visitor.name || "You";
+
   const route = useMemo(() => {
     if (!graph || targetIndex < 0) return null;
-    const sources = sourceMode === "visitor" ? linkedIndexes : [sourceIndex];
+    const sources = sourceMode === "player" ? [sourceIndex] : sourceLinkedIndexes;
     return findShortestRoute(
       graph,
       sources.filter((index) => index >= 0),
       targetIndex,
-      sourceMode === "visitor",
+      sourceMode !== "player",
     );
-  }, [graph, linkedIndexes, sourceIndex, sourceMode, targetIndex, routePulse]);
+  }, [graph, sourceIndex, sourceLinkedIndexes, sourceMode, targetIndex]);
 
   const degreeCount = route
-    ? route.eventIds.length + (route.fromVisitor ? 1 : 0)
+    ? route.eventIds.length + (route.fromPerson ? 1 : 0)
     : 0;
 
   const distanceStats = useMemo(
@@ -461,10 +607,21 @@ export default function Home() {
   const addVisitorLink = (playerIndex = linkCandidateIndex) => {
     if (!graph || playerIndex < 0 || !visitor.name.trim()) return;
     const playerId = graph.players[playerIndex].id;
+    if (
+      visitor.linkedPlayerIds.length >= 12 &&
+      !visitor.linkedPlayerIds.includes(playerId)
+    ) {
+      setProfileStatus("error");
+      setProfileMessage("A shared profile can have up to 12 direct player links.");
+      return;
+    }
     setVisitor((current) => ({
+      ...current,
       name: current.name.trim(),
       linkedPlayerIds: Array.from(new Set([...current.linkedPlayerIds, playerId])),
     }));
+    setProfileStatus("idle");
+    setProfileMessage("");
     setLinkQuery("");
     setLinkCandidateIndex(-1);
     setSourceMode("visitor");
@@ -483,10 +640,55 @@ export default function Home() {
       ...current,
       linkedPlayerIds: current.linkedPlayerIds.filter((id) => id !== playerId),
     }));
+    setProfileStatus("idle");
+    setProfileMessage("");
+  };
+
+  const saveVisitorProfile = async () => {
+    if (!visitor.name.trim() || visitor.linkedPlayerIds.length === 0) return;
+    setProfileStatus("saving");
+    setProfileMessage("");
+
+    try {
+      const updating = Boolean(visitor.id && visitor.editToken);
+      const response = await fetch("/api/people", {
+        method: updating ? "PUT" : "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          id: visitor.id,
+          editToken: visitor.editToken,
+          displayName: visitor.name,
+          playerIds: visitor.linkedPlayerIds,
+        }),
+      });
+      const payload = (await response.json()) as {
+        person?: PublicPerson;
+        editToken?: string;
+        error?: string;
+      };
+      if (!response.ok || !payload.person) {
+        throw new Error(payload.error || "Your profile could not be saved.");
+      }
+
+      setVisitor((current) => ({
+        id: payload.person?.id,
+        slug: payload.person?.slug,
+        editToken: payload.editToken || current.editToken,
+        name: payload.person?.displayName || current.name,
+        linkedPlayerIds: payload.person?.playerIds || current.linkedPlayerIds,
+      }));
+      setProfileStatus("saved");
+      setProfileMessage("Saved — other people can now find and route from you.");
+    } catch (error) {
+      setProfileStatus("error");
+      setProfileMessage(
+        error instanceof Error ? error.message : "Your profile could not be saved.",
+      );
+    }
   };
 
   const swapPlayers = () => {
-    if (!graph || sourceMode === "visitor") return;
+    if (!graph || sourceMode !== "player") return;
     setSourceIndex(targetIndex);
     setTargetIndex(sourceIndex);
     setSourceQuery(graph.players[targetIndex].shortName);
@@ -576,15 +778,18 @@ export default function Home() {
 
           {graph && (
             <>
-              {sourceMode === "visitor" ? (
+              {sourceMode !== "player" ? (
                 <div className="visitor-source">
                   <span className="visitor-avatar" aria-hidden="true">
-                    {getInitials(visitor.name || "You")}
+                    {getInitials(sourcePersonName)}
                   </span>
                   <span>
                     <small>STARTING FROM</small>
-                    <strong>{visitor.name || "You"}</strong>
-                    <em>{linkedIndexes.length} direct player link{linkedIndexes.length === 1 ? "" : "s"}</em>
+                    <strong>{sourcePersonName}</strong>
+                    <em>
+                      {sourceLinkedIndexes.length} direct player link
+                      {sourceLinkedIndexes.length === 1 ? "" : "s"}
+                    </em>
                   </span>
                   <button type="button" onClick={() => setSourceMode("player")}>Change</button>
                 </div>
@@ -606,7 +811,7 @@ export default function Home() {
                 <button
                   type="button"
                   onClick={swapPlayers}
-                  disabled={sourceMode === "visitor"}
+                  disabled={sourceMode !== "player"}
                   aria-label="Swap players"
                   title="Swap players"
                 >
@@ -638,6 +843,16 @@ export default function Home() {
                 </button>
               )}
 
+              {sourceMode === "player" && (
+                <PeoplePicker
+                  graph={graph}
+                  onSelect={(person) => {
+                    setCommunityPerson(person);
+                    setSourceMode("community");
+                  }}
+                />
+              )}
+
               <button type="button" className="trace-button" onClick={traceRoute}>
                 TRACE THE LINK <span aria-hidden="true">→</span>
               </button>
@@ -650,7 +865,7 @@ export default function Home() {
                   </strong>
                 ) : (
                   <strong>
-                    {sourceMode === "visitor" && linkedIndexes.length === 0
+                    {sourceMode !== "player" && sourceLinkedIndexes.length === 0
                       ? "Add your first link"
                       : "No route found"}
                   </strong>
@@ -681,9 +896,11 @@ export default function Home() {
                   id="visitor-name"
                   className="name-input"
                   value={visitor.name}
-                  onChange={(event) =>
-                    setVisitor((current) => ({ ...current, name: event.target.value }))
-                  }
+                  onChange={(event) => {
+                    setVisitor((current) => ({ ...current, name: event.target.value }));
+                    setProfileStatus("idle");
+                    setProfileMessage("");
+                  }}
                   placeholder="e.g. Andrew"
                 />
 
@@ -702,28 +919,51 @@ export default function Home() {
                   type="button"
                   className="add-link-button"
                   onClick={() => addVisitorLink()}
-                  disabled={!visitor.name.trim() || linkCandidateIndex < 0}
+                  disabled={
+                    !visitor.name.trim() ||
+                    linkCandidateIndex < 0 ||
+                    visitor.linkedPlayerIds.length >= 12
+                  }
                 >
                   ADD MY CONNECTION
                 </button>
 
                 {linkedIndexes.length > 0 && (
-                  <div className="linked-list">
-                    <span>YOUR DIRECT LINKS</span>
-                    {linkedIndexes.map((index) => {
-                      const player = graph.players[index];
-                      return (
-                        <button
-                          type="button"
-                          key={player.id}
-                          onClick={() => removeVisitorLink(player.id)}
-                          title={`Remove ${player.shortName}`}
-                        >
-                          {player.shortName} <span aria-hidden="true">×</span>
-                        </button>
-                      );
-                    })}
-                  </div>
+                  <>
+                    <div className="linked-list">
+                      <span>YOUR DIRECT LINKS · {linkedIndexes.length}/12</span>
+                      {linkedIndexes.map((index) => {
+                        const player = graph.players[index];
+                        return (
+                          <button
+                            type="button"
+                            key={player.id}
+                            onClick={() => removeVisitorLink(player.id)}
+                            title={`Remove ${player.shortName}`}
+                          >
+                            {player.shortName} <span aria-hidden="true">×</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <button
+                      type="button"
+                      className="save-profile-button"
+                      onClick={saveVisitorProfile}
+                      disabled={profileStatus === "saving"}
+                    >
+                      {profileStatus === "saving"
+                        ? "SAVING…"
+                        : visitor.id
+                          ? "UPDATE SHARED PROFILE"
+                          : "SAVE TO COMMUNITY"}
+                    </button>
+                    {profileMessage && (
+                      <p className={`profile-message ${profileStatus}`} role="status">
+                        {profileMessage}
+                      </p>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -756,21 +996,25 @@ export default function Home() {
           {graph && route && (
             <div className="path-scroll" key={`${sourceMode}-${sourceIndex}-${targetIndex}-${routePulse}`}>
               <div className="path-track">
-                {route.fromVisitor && (
+                {route.fromPerson && (
                   <>
                     <article className="player-node visitor-node">
-                      <span className="node-degree">YOU</span>
-                      <div className="node-avatar">{getInitials(visitor.name || "You")}</div>
+                      <span className="node-degree">
+                        {sourceMode === "visitor" ? "YOU" : "PERSON"}
+                      </span>
+                      <div className="node-avatar">{getInitials(sourcePersonName)}</div>
                       <div className="node-copy">
-                        <strong>{visitor.name || "You"}</strong>
-                        <small>Added by you</small>
+                        <strong>{sourcePersonName}</strong>
+                        <small>
+                          {sourceMode === "visitor" ? "Your profile" : "Community profile"}
+                        </small>
                       </div>
                     </article>
                     <div className="connection personal-connection">
                       <span className="connection-line"><i /></span>
                       <div className="connection-label">
                         <strong>PERSONAL LINK</strong>
-                        <small>You know this player</small>
+                        <small>Knows this player</small>
                       </div>
                     </div>
                   </>
@@ -782,7 +1026,7 @@ export default function Home() {
                   const connection = step < route.eventIds.length
                     ? graph.events[route.eventIds[step]]
                     : null;
-                  const number = step + (route.fromVisitor ? 1 : 0);
+                  const number = step + (route.fromPerson ? 1 : 0);
 
                   return (
                     <div className="path-segment" key={`${player.id}-${step}`}>
@@ -813,7 +1057,19 @@ export default function Home() {
                             <strong>
                               {connection.kind === "club" ? "CLUBMATES" : "NATIONAL TEAM"}
                             </strong>
-                            <small>{connection.name} · {formatEdition(connection.fifaYear)}</small>
+                            <small>
+                              {connection.sourceUrl ? (
+                                <a
+                                  href={connection.sourceUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                >
+                                  {connection.label || `${connection.name} · ${formatEdition(connection.fifaYear)}`}
+                                </a>
+                              ) : (
+                                `${connection.name} · ${formatEdition(connection.fifaYear)}`
+                              )}
+                            </small>
                           </div>
                         </div>
                       )}
@@ -828,13 +1084,13 @@ export default function Home() {
             <div className="empty-map">
               <span aria-hidden="true">?</span>
               <strong>
-                {sourceMode === "visitor" && linkedIndexes.length === 0
-                  ? "You need a way into the network"
+                {sourceMode !== "player" && sourceLinkedIndexes.length === 0
+                  ? "This person needs a way into the network"
                   : "These players sit in different networks"}
               </strong>
               <p>
-                {sourceMode === "visitor" && linkedIndexes.length === 0
-                  ? "Add a player you know, then we’ll carry the route all the way to your target."
+                {sourceMode !== "player" && sourceLinkedIndexes.length === 0
+                  ? "Add a direct player connection, then we’ll carry the route to the target."
                   : "Try another pairing or add a personal connection to bridge the gap."}
               </p>
             </div>
@@ -963,7 +1219,7 @@ export default function Home() {
             <span>02</span>
             <div className="method-icon nation-icon" aria-hidden="true">★</div>
             <h3>National squads</h3>
-            <p>Called-up internationals connect by year. Missing squads use the top 30 rated players.</p>
+            <p>Called-up internationals connect by year, with sourced Philippine tournament and qualifier cohorts.</p>
           </article>
           <article>
             <span>03</span>

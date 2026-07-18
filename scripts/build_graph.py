@@ -26,6 +26,7 @@ import argparse
 import csv
 import json
 import re
+import unicodedata
 import zlib
 from collections import defaultdict
 from collections.abc import Iterable
@@ -45,6 +46,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("output", type=Path)
     parser.add_argument("--fc25", type=Path, help="FC 25 new-players-data-full.csv")
     parser.add_argument("--fc26", type=Path, help="FC26_YYYYMMDD.csv")
+    parser.add_argument(
+        "--philippines-squads",
+        type=Path,
+        default=Path("data/philippines_squads.csv"),
+        help="Wikipedia-sourced Philippines squad memberships",
+    )
     return parser.parse_args()
 
 
@@ -196,6 +203,44 @@ def load_rows(args: argparse.Namespace) -> list[NormalizedRow]:
     return [row for row in rows if int(row["id"]) > 0 and int(row["year"]) > 0]
 
 
+def normalized_name(value: object) -> str:
+    return " ".join(
+        "".join(
+            character
+            for character in unicodedata.normalize("NFKD", clean(value)).casefold()
+            if character.isalnum() or character.isspace()
+        ).split()
+    )
+
+
+def synthetic_player_id(name: str) -> int:
+    return 800_000_000 + zlib.crc32(normalized_name(name).encode("utf-8"))
+
+
+def load_philippines_squads(path: Path | None) -> list[dict[str, object]]:
+    if path is None or not path.exists():
+        return []
+
+    rows: list[dict[str, object]] = []
+    with path.open(encoding="utf-8-sig", newline="") as handle:
+        for row in csv.DictReader(handle):
+            player_name = clean(row.get("player_name"))
+            event_label = clean(row.get("event_label"))
+            if not player_name or not event_label:
+                continue
+            rows.append(
+                {
+                    "event_label": event_label,
+                    "event_year": number(row.get("event_year")),
+                    "player_name": player_name,
+                    "position": clean(row.get("position")),
+                    "club": clean(row.get("club")),
+                    "source_url": clean(row.get("source_url")),
+                }
+            )
+    return rows
+
+
 def main() -> None:
     args = parse_args()
     rows = load_rows(args)
@@ -224,6 +269,8 @@ def main() -> None:
 
     player_by_id: dict[int, dict[str, object]] = {}
     memberships: dict[tuple[str, int, str], set[int]] = defaultdict(set)
+    supplemental_events: dict[tuple[int, str, str], set[int]] = defaultdict(set)
+    supplemental_player_ids: set[int] = set()
 
     for row in rows:
         player_id = int(row["id"])
@@ -267,6 +314,71 @@ def main() -> None:
         if called_up and nationality:
             memberships[("nation", edition, nationality)].add(player_id)
 
+    name_to_player_id: dict[str, int] = {}
+    for player_id, player in player_by_id.items():
+        for name in (player["shortName"], player["longName"]):
+            normalized = normalized_name(name)
+            if normalized:
+                name_to_player_id.setdefault(normalized, player_id)
+
+    # Wikipedia roster names are often shorter than SoFIFA's legal names. These
+    # verified aliases preserve the original player ids where a graph node
+    # already exists; everyone else receives a deterministic supplemental id.
+    philippines_aliases = {
+        "alvaro silva": 163870,
+        "bjorn martin kristensen": 271533,
+        "daisuke sato": 239404,
+        "iain ramsay": 200394,
+        "jefferson tabinas": 237659,
+        "jerry lucena": 30690,
+        "jesper nyholm": 237226,
+        "kevin ray mendoza": 215656,
+        "luke woodland": 213852,
+        "martin steuble": 189113,
+        "michael kempter": 230691,
+        "mike ott": 212191,
+        "neil etheridge": 193186,
+    }
+
+    for squad_row in load_philippines_squads(args.philippines_squads):
+        name = str(squad_row["player_name"])
+        normalized = normalized_name(name)
+        player_id = philippines_aliases.get(normalized) or name_to_player_id.get(normalized)
+        if player_id is None:
+            player_id = synthetic_player_id(name)
+
+        event_year = int(squad_row["event_year"])
+        if player_id not in player_by_id:
+            player_by_id[player_id] = {
+                "id": player_id,
+                "shortName": name,
+                "longName": name,
+                "nationality": "Philippines",
+                "position": squad_row["position"],
+                "club": squad_row["club"],
+                "overall": 0,
+                "firstYear": event_year % 100,
+                "lastYear": event_year % 100,
+            }
+            supplemental_player_ids.add(player_id)
+        elif player_id in supplemental_player_ids:
+            player = player_by_id[player_id]
+            previous_latest = int(player["lastYear"])
+            player["firstYear"] = min(int(player["firstYear"]), event_year % 100)
+            player["lastYear"] = max(previous_latest, event_year % 100)
+            if event_year % 100 >= previous_latest:
+                if squad_row["position"]:
+                    player["position"] = squad_row["position"]
+                if squad_row["club"]:
+                    player["club"] = squad_row["club"]
+
+        event_key = (
+            event_year,
+            str(squad_row["event_label"]),
+            str(squad_row["source_url"]),
+        )
+        supplemental_events[event_key].add(player_id)
+
     players = sorted(
         player_by_id.values(),
         key=lambda player: (str(player["shortName"]).casefold(), int(player["id"])),
@@ -292,11 +404,31 @@ def main() -> None:
             }
         )
 
+    for (event_year, label, source_url), members in sorted(
+        supplemental_events.items(), reverse=True
+    ):
+        if len(members) < 2:
+            continue
+        indexed_members = sorted(player_index[player_id] for player_id in members)
+        relationship_count += len(indexed_members)
+        events.append(
+            {
+                "kind": "nation",
+                "name": "Philippines",
+                "fifaYear": event_year % 100,
+                "label": label,
+                "sourceUrl": source_url,
+                "members": indexed_members,
+            }
+        )
+
     sources = ["stefanoleone992/ea-sports-fc-24-complete-player-dataset"]
     if args.fc25:
         sources.append("sametozturkk/ea-sports-fc-25-real-player-data-sofifa-merge")
     if args.fc26:
         sources.append("rovnez/fc-26-fifa-26-player-data")
+    if supplemental_events:
+        sources.append("Wikipedia Philippines squad and qualifying pages")
 
     payload = {
         "meta": {
